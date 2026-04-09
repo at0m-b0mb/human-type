@@ -1,2 +1,4 @@
 pyautogui
 pyperclip
+customtkinter>=5.2.2
+pynput>=1.7.7
