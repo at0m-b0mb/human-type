@@ -4,6 +4,7 @@ import threading
 import time
 import random
 import re
+import datetime as _dt
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -46,6 +47,8 @@ DEFAULT_CONFIG = {
     "custom_presets": {},
     "custom_snippets": {},
     "draft": "",
+    "session_history": [],
+    "repeat": {"count": "1", "separator": "\\n\\n"},
     "stats": {
         "lifetime_chars": 0,
         "lifetime_sessions": 0,
@@ -67,6 +70,9 @@ DEFAULT_CONFIG = {
         "common_typos": False,
         "cap_slips": False,
         "burst_mode": False,
+        "idle_pauses": False,
+        "expand_vars": True,
+        "show_overlay": False,
     },
 }
 
@@ -174,6 +180,132 @@ BUILTIN_SNIPPETS = {
 }
 
 # ---------------------------------------------------------------------------
+# Variables / macros — expanded just before typing
+# ---------------------------------------------------------------------------
+VARIABLES = [
+    ("{date}",       "Today's date (YYYY-MM-DD)"),
+    ("{time}",       "Current time (HH:MM)"),
+    ("{datetime}",   "ISO date + time"),
+    ("{weekday}",    "Day of week (e.g. Wednesday)"),
+    ("{month}",      "Month name (e.g. May)"),
+    ("{year}",       "Current year"),
+    ("{clipboard}",  "Current clipboard contents"),
+    ("{random:6}",   "Random N-digit number (change 6)"),
+    ("{tab}",        "Tab character"),
+    ("{newline}",    "Newline character"),
+]
+
+
+def expand_variables(text):
+    """Replace {date}, {time}, {clipboard}, {random:N}, etc. in `text`."""
+    now = _dt.datetime.now()
+    repl = {
+        "{date}":     now.strftime("%Y-%m-%d"),
+        "{time}":     now.strftime("%H:%M"),
+        "{datetime}": now.strftime("%Y-%m-%d %H:%M"),
+        "{weekday}":  now.strftime("%A"),
+        "{month}":    now.strftime("%B"),
+        "{year}":     now.strftime("%Y"),
+        "{tab}":      "\t",
+        "{newline}":  "\n",
+    }
+    for k, v in repl.items():
+        text = text.replace(k, v)
+
+    try:
+        clip = pyperclip.paste() or ""
+    except Exception:
+        clip = ""
+    text = text.replace("{clipboard}", clip)
+
+    def _rand(m):
+        n = max(1, min(20, int(m.group(1))))
+        return str(random.randint(10 ** (n - 1), 10 ** n - 1))
+    text = re.sub(r"\{random:(\d+)\}", _rand, text)
+    return text
+
+
+# ---------------------------------------------------------------------------
+# Text transforms — pure string operations
+# ---------------------------------------------------------------------------
+def _smart_quotes(s):
+    out = []
+    in_dq = False
+    in_sq = False
+    for c in s:
+        if c == '"':
+            out.append("”" if in_dq else "“")
+            in_dq = not in_dq
+        elif c == "'":
+            out.append("’" if in_sq else "‘")
+            in_sq = not in_sq
+        else:
+            out.append(c)
+    return "".join(out)
+
+
+def _strip_markdown(s):
+    s = re.sub(r"`{1,3}([^`]*)`{1,3}", r"\1", s)
+    s = re.sub(r"\*\*([^*]+)\*\*", r"\1", s)
+    s = re.sub(r"\*([^*]+)\*", r"\1", s)
+    s = re.sub(r"__([^_]+)__", r"\1", s)
+    s = re.sub(r"_([^_]+)_", r"\1", s)
+    s = re.sub(r"^#{1,6}\s*", "", s, flags=re.MULTILINE)
+    s = re.sub(r"^\s*[-*+]\s+", "", s, flags=re.MULTILINE)
+    s = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", s)
+    return s
+
+
+def _sentence_case(s):
+    def cap(m):
+        return m.group(1) + m.group(2).upper()
+    return re.sub(r"(^|[.!?]\s+)([a-z])", cap, s.lower())
+
+
+TRANSFORMS = [
+    ("UPPERCASE",        lambda s: s.upper()),
+    ("lowercase",        lambda s: s.lower()),
+    ("Title Case",       lambda s: s.title()),
+    ("Sentence case",    _sentence_case),
+    ("Trim each line",   lambda s: "\n".join(line.strip() for line in s.splitlines())),
+    ("Collapse spaces",  lambda s: re.sub(r"[ \t]+", " ", s)),
+    ("Sort lines A→Z",   lambda s: "\n".join(sorted(s.splitlines()))),
+    ("Reverse lines",    lambda s: "\n".join(reversed(s.splitlines()))),
+    ("Dedupe lines",     lambda s: "\n".join(dict.fromkeys(s.splitlines()))),
+    ("Smart quotes",     _smart_quotes),
+    ("Strip markdown",   _strip_markdown),
+]
+
+
+def flesch_reading_ease(text):
+    words = re.findall(r"[A-Za-z']+", text)
+    sentences = max(1, len(re.findall(r"[.!?]+", text)))
+    if not words:
+        return 0, 0
+    syllables = sum(_count_syllables(w) for w in words)
+    w, s, sy = len(words), sentences, syllables
+    ease = 206.835 - 1.015 * (w / s) - 84.6 * (sy / w)
+    grade = 0.39 * (w / s) + 11.8 * (sy / w) - 15.59
+    return ease, grade
+
+
+def _count_syllables(word):
+    word = word.lower()
+    if not word:
+        return 0
+    vowels = "aeiouy"
+    count, prev = 0, False
+    for c in word:
+        v = c in vowels
+        if v and not prev:
+            count += 1
+        prev = v
+    if word.endswith("e") and count > 1:
+        count -= 1
+    return max(1, count)
+
+
+# ---------------------------------------------------------------------------
 # Typing behaviour constants
 # ---------------------------------------------------------------------------
 CHARS_PER_WORD = 5
@@ -190,6 +322,12 @@ BURST_WORDS_MIN = 6
 BURST_WORDS_MAX = 14
 BURST_REST_MIN = 0.4
 BURST_REST_MAX = 1.4
+
+# Idle "thinking" pause tuning
+IDLE_CHARS_MIN = 150
+IDLE_CHARS_MAX = 350
+IDLE_PAUSE_MIN = 0.8
+IDLE_PAUSE_MAX = 2.6
 
 # Probability that a word in the input gets temporarily mistyped using a
 # realistic English misspelling, then corrected.
@@ -430,16 +568,19 @@ class HumanTyperApp(ctk.CTk):
         bar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=4, pady=(4, 8))
 
         buttons = [
-            ("📂", "Load File",        self.load_file),
-            ("📋", "Clipboard",        self.import_clipboard),
-            ("🔍", "Find / Replace",   self.open_find_replace),
-            ("🕘", "Recent",           self._open_recent_menu),
-            ("🧹", "Clear",            self.clear_text),
+            ("📂", "Load",       self.load_file),
+            ("📋", "Clipboard",  self.import_clipboard),
+            ("🔍", "Find",       self.open_find_replace),
+            ("✨", "Transform",  self._open_transform_menu),
+            ("🔣", "Variable",   self._open_variables_menu),
+            ("🧪", "Dry Run",    self._dry_run),
+            ("🕘", "Recent",     self._open_recent_menu),
+            ("🧹", "Clear",      self.clear_text),
         ]
         for idx, (icon, label, cmd) in enumerate(buttons):
             ctk.CTkButton(
-                bar, text=f"{icon}  {label}", width=140, command=cmd,
-            ).pack(side="left", padx=(0, 8))
+                bar, text=f"{icon}  {label}", width=110, command=cmd,
+            ).pack(side="left", padx=(0, 6))
 
         self._count_var = tk.StringVar(value="0 chars · 0 words")
         ctk.CTkLabel(
@@ -476,6 +617,8 @@ class HumanTyperApp(ctk.CTk):
             ("Avg word",   "avg_word"),
             ("Reading",    "reading"),
             ("Est. type",  "estimate"),
+            ("Flesch ease", "flesch"),
+            ("Grade level", "grade"),
         ]
         for r, (label, key) in enumerate(rows, start=1):
             row = ctk.CTkFrame(side, fg_color="transparent")
@@ -598,6 +741,9 @@ class HumanTyperApp(ctk.CTk):
         self._common_typos = tk.BooleanVar(value=False)
         self._cap_slip_var = tk.BooleanVar(value=False)
         self._burst_mode   = tk.BooleanVar(value=False)
+        self._idle_var     = tk.BooleanVar(value=False)
+        self._vars_expand  = tk.BooleanVar(value=True)
+        self._overlay_var  = tk.BooleanVar(value=False)
 
         switches = [
             ("Newlines → Enter key",        self._enter_var,
@@ -612,10 +758,16 @@ class HumanTyperApp(ctk.CTk):
              "Rare wrong-case letter then quick correction"),
             ("Burst mode (chunks + rests)", self._burst_mode,
              "Type a few words quickly, rest, repeat"),
+            ("Idle thinking pauses",        self._idle_var,
+             "Occasional realistic 1-3 s mid-text pauses"),
+            ("Expand {variables}",          self._vars_expand,
+             "Substitute {date}, {time}, {clipboard}, {random:N}…"),
+            ("Floating overlay window",     self._overlay_var,
+             "Always-on-top progress window while typing"),
         ]
         for r, (text, var, desc) in enumerate(switches, start=1):
             row = ctk.CTkFrame(behav, fg_color="transparent")
-            row.grid(row=r, column=0, sticky="ew", padx=16, pady=4)
+            row.grid(row=r, column=0, sticky="ew", padx=16, pady=3)
             ctk.CTkSwitch(
                 row, text=text, variable=var, onvalue=True, offvalue=False,
             ).pack(anchor="w")
@@ -623,6 +775,25 @@ class HumanTyperApp(ctk.CTk):
                 row, text=desc, text_color="gray55",
                 font=ctk.CTkFont(size=10),
             ).pack(anchor="w", padx=(46, 0))
+
+        # Repeat row inside the timing card
+        rrow = ctk.CTkFrame(timing, fg_color="transparent")
+        rrow.grid(row=98, column=0, columnspan=4, sticky="ew",
+                  padx=14, pady=(6, 0))
+        ctk.CTkLabel(
+            rrow, text="🔁  Repeat:", font=ctk.CTkFont(size=12),
+        ).pack(side="left")
+        self._repeat_count_var = tk.StringVar(value="1")
+        ctk.CTkEntry(rrow, textvariable=self._repeat_count_var, width=60).pack(
+            side="left", padx=(8, 6))
+        ctk.CTkLabel(rrow, text="times, separator:",
+                     text_color="gray60").pack(side="left", padx=(0, 6))
+        self._repeat_sep_var = tk.StringVar(value="\\n\\n")
+        ctk.CTkEntry(rrow, textvariable=self._repeat_sep_var, width=120).pack(
+            side="left")
+        ctk.CTkLabel(rrow, text=" (use \\n for newline, \\t for tab)",
+                     text_color="gray55",
+                     font=ctk.CTkFont(size=10)).pack(side="left")
 
     # ----- Snippets tab ----------------------------------------------------
     def _build_snippets_tab(self, tab):
@@ -740,13 +911,35 @@ class HumanTyperApp(ctk.CTk):
         self._session_seconds = 0.0
         self._session_last_wpm = 0.0
 
+        ctk.CTkLabel(
+            tab, text="RECENT SESSIONS",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="gray60",
+        ).grid(row=6, column=0, columnspan=3, sticky="w", padx=8, pady=(20, 0))
+
+        self._history_frame = ctk.CTkScrollableFrame(
+            tab, corner_radius=10, height=180,
+        )
+        self._history_frame.grid(row=7, column=0, columnspan=3,
+                                 sticky="ew", padx=8, pady=(6, 0))
+        self._history_frame.grid_columnconfigure(0, weight=1)
+
+        btnrow = ctk.CTkFrame(tab, fg_color="transparent")
+        btnrow.grid(row=8, column=0, columnspan=3, sticky="ew",
+                    padx=8, pady=(10, 8))
         ctk.CTkButton(
-            tab, text="🧹  Reset Lifetime Stats",
+            btnrow, text="🧹  Reset Lifetime Stats",
             fg_color="transparent", border_width=1,
             command=self._reset_lifetime_stats,
-        ).grid(row=6, column=0, columnspan=3, sticky="w", padx=8, pady=(20, 8))
+        ).pack(side="left")
+        ctk.CTkButton(
+            btnrow, text="🗑  Clear History",
+            fg_color="transparent", border_width=1,
+            command=self._clear_history,
+        ).pack(side="left", padx=(8, 0))
 
         self._refresh_stat_cards()
+        self._refresh_history()
 
     def _stat_card(self, parent, r, c, label, initial):
         card = ctk.CTkFrame(parent, corner_radius=10)
@@ -786,13 +979,44 @@ class HumanTyperApp(ctk.CTk):
         notes = (
             "• F5 starts typing, F6 pauses/resumes, Esc stops.\n"
             "• Move the mouse to the top-left corner to fail-safe-abort at any moment.\n"
-            "• Your draft, settings, snippets and lifetime stats persist in "
+            "• Your draft, settings, snippets, history & lifetime stats persist in "
             f"{CONFIG_PATH}.\n"
             "• On macOS, grant Accessibility permission to your terminal/IDE.\n"
         )
         ctk.CTkLabel(
             card, text=notes, justify="left", text_color="gray60",
         ).grid(row=2, column=0, sticky="w", padx=18, pady=(0, 16))
+
+        # Variables documentation
+        vcard = ctk.CTkFrame(tab, corner_radius=10)
+        vcard.grid(row=1, column=0, sticky="ew", padx=4, pady=4)
+        vcard.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            vcard, text="🔣  Variables",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).grid(row=0, column=0, sticky="w", padx=18, pady=(14, 4))
+        ctk.CTkLabel(
+            vcard,
+            text="Drop these into your text — they're expanded the moment "
+                 "typing starts (toggle in Tweaks → Behaviour).",
+            text_color="gray60", justify="left", wraplength=720,
+        ).grid(row=1, column=0, sticky="w", padx=18, pady=(0, 8))
+
+        for i, (token, desc) in enumerate(VARIABLES, start=2):
+            row = ctk.CTkFrame(vcard, fg_color="transparent")
+            row.grid(row=i, column=0, sticky="ew", padx=18, pady=1)
+            row.grid_columnconfigure(1, weight=1)
+            mono = "Menlo" if _IS_MAC else "Consolas"
+            ctk.CTkLabel(
+                row, text=token,
+                font=ctk.CTkFont(family=mono, size=12, weight="bold"),
+            ).grid(row=0, column=0, sticky="w")
+            ctk.CTkLabel(
+                row, text=desc, text_color="gray60",
+            ).grid(row=0, column=1, sticky="w", padx=(14, 0))
+
+        ctk.CTkLabel(vcard, text="").grid(row=99, column=0, pady=(0, 8))
 
     # ----- Action bar + status --------------------------------------------
     def _build_action_bar(self, parent):
@@ -805,29 +1029,36 @@ class HumanTyperApp(ctk.CTk):
         self._prog.set(0)
 
         self._start_btn = ctk.CTkButton(
-            ab, text="▶  Start Typing  (F5)", width=180,
+            ab, text="▶  Start Typing  (F5)", width=170,
             font=ctk.CTkFont(size=13, weight="bold"),
             command=self.start_typing,
         )
         self._start_btn.grid(row=0, column=0, sticky="w")
 
+        self._schedule_btn = ctk.CTkButton(
+            ab, text="🕒  Schedule…", width=120,
+            fg_color="transparent", border_width=1,
+            command=self._schedule_start,
+        )
+        self._schedule_btn.grid(row=0, column=1, padx=(8, 0))
+
         self._pause_btn = ctk.CTkButton(
-            ab, text="⏸  Pause  (F6)", width=130,
+            ab, text="⏸  Pause  (F6)", width=120,
             fg_color="transparent", border_width=1, state="disabled",
             command=self.toggle_pause,
         )
-        self._pause_btn.grid(row=0, column=1, padx=(8, 0))
+        self._pause_btn.grid(row=0, column=2, padx=(8, 0))
 
         ctk.CTkButton(
-            ab, text="⏹  Stop  (Esc)", width=130,
+            ab, text="⏹  Stop  (Esc)", width=110,
             fg_color="transparent", border_width=1,
             command=self.stop_typing,
-        ).grid(row=0, column=2, padx=(8, 0))
+        ).grid(row=0, column=3, padx=(8, 0))
 
         self._eta_var = tk.StringVar(value="")
         ctk.CTkLabel(
             ab, textvariable=self._eta_var, text_color="gray60",
-        ).grid(row=0, column=3, padx=(16, 0))
+        ).grid(row=0, column=4, padx=(16, 0))
 
         self._wpm_var = tk.StringVar(value="")
         ctk.CTkLabel(
@@ -867,6 +1098,13 @@ class HumanTyperApp(ctk.CTk):
         self._common_typos.set(toggles.get("common_typos", False))
         self._cap_slip_var.set(toggles.get("cap_slips", False))
         self._burst_mode.set(toggles.get("burst_mode", False))
+        self._idle_var.set(toggles.get("idle_pauses", False))
+        self._vars_expand.set(toggles.get("expand_vars", True))
+        self._overlay_var.set(toggles.get("show_overlay", False))
+        # Restore repeat
+        rep = self.config.get("repeat", {})
+        self._repeat_count_var.set(rep.get("count", "1"))
+        self._repeat_sep_var.set(rep.get("separator", "\\n\\n"))
         # Restore draft
         draft = self.config.get("draft", "")
         if draft:
@@ -887,6 +1125,13 @@ class HumanTyperApp(ctk.CTk):
                 "common_typos": self._common_typos.get(),
                 "cap_slips": self._cap_slip_var.get(),
                 "burst_mode": self._burst_mode.get(),
+                "idle_pauses": self._idle_var.get(),
+                "expand_vars": self._vars_expand.get(),
+                "show_overlay": self._overlay_var.get(),
+            }
+            self.config["repeat"] = {
+                "count": self._repeat_count_var.get(),
+                "separator": self._repeat_sep_var.get(),
             }
             self.config["theme"] = self._theme_name
             self.config["dark_mode"] = ctk.get_appearance_mode().lower() == "dark"
@@ -1108,6 +1353,13 @@ class HumanTyperApp(ctk.CTk):
             self._stat_rows["avg_word"].set(f"{avg_word:.1f}" if words else "—")
             self._stat_rows["reading"].set(self._fmt_secs(reading_secs) if words else "—")
             self._stat_rows["estimate"].set(self._fmt_secs(est_secs) if chars else "—")
+            if words:
+                ease, grade = flesch_reading_ease(text)
+                self._stat_rows["flesch"].set(f"{ease:.0f}")
+                self._stat_rows["grade"].set(f"{max(0, grade):.1f}")
+            else:
+                self._stat_rows["flesch"].set("—")
+                self._stat_rows["grade"].set("—")
 
     def _estimate_type_seconds(self, text):
         try:
@@ -1385,6 +1637,20 @@ class HumanTyperApp(ctk.CTk):
             messagebox.showerror("Invalid Settings", "All settings must be numeric.")
             return
 
+        # Variable expansion
+        if self._vars_expand.get():
+            text = expand_variables(text)
+
+        # Repeat
+        try:
+            repeat_n = max(1, int(self._repeat_count_var.get() or "1"))
+        except ValueError:
+            repeat_n = 1
+        if repeat_n > 1:
+            sep = (self._repeat_sep_var.get() or "")\
+                .replace("\\n", "\n").replace("\\t", "\t")
+            text = sep.join([text] * repeat_n)
+
         self._stop = False
         self._pause.set()
         self._prog.set(0)
@@ -1395,6 +1661,9 @@ class HumanTyperApp(ctk.CTk):
         self._typing_active = True
         self._persist_state()
 
+        if self._overlay_var.get():
+            self._build_overlay()
+
         threading.Thread(
             target=self._run,
             args=(text, cfg,
@@ -1403,7 +1672,8 @@ class HumanTyperApp(ctk.CTk):
                   self._burst_var.get(),
                   self._common_typos.get(),
                   self._cap_slip_var.get(),
-                  self._burst_mode.get()),
+                  self._burst_mode.get(),
+                  self._idle_var.get()),
             daemon=True,
         ).start()
 
@@ -1411,7 +1681,7 @@ class HumanTyperApp(ctk.CTk):
     # Core typing loop (background thread)
     # =======================================================================
     def _run(self, text, cfg, press_enter, fatigue, word_burst,
-             common_typos, cap_slips, burst_mode):
+             common_typos, cap_slips, burst_mode, idle_pauses):
         try:
             start_delay = cfg["start_delay"]
             base_delay  = cfg["base_delay"]
@@ -1441,6 +1711,8 @@ class HumanTyperApp(ctk.CTk):
 
             words_since_rest = 0
             next_rest_word_target = random.randint(BURST_WORDS_MIN, BURST_WORDS_MAX)
+            chars_since_idle = 0
+            next_idle_target = random.randint(IDLE_CHARS_MIN, IDLE_CHARS_MAX)
 
             while i < len(text):
                 if self._stop:
@@ -1565,6 +1837,16 @@ class HumanTyperApp(ctk.CTk):
                         next_rest_word_target = random.randint(
                             BURST_WORDS_MIN, BURST_WORDS_MAX)
 
+                # ── Idle "thinking" pause ─────────────────────────────────
+                if idle_pauses:
+                    chars_since_idle += 1
+                    if chars_since_idle >= next_idle_target:
+                        self._set_status("Pausing to think…", "warn")
+                        time.sleep(random.uniform(IDLE_PAUSE_MIN, IDLE_PAUSE_MAX))
+                        chars_since_idle = 0
+                        next_idle_target = random.randint(
+                            IDLE_CHARS_MIN, IDLE_CHARS_MAX)
+
                 self._tick(typed, total, chars_wpm, t0)
 
             self._record_session(typed, time.time() - t0, chars_wpm)
@@ -1588,8 +1870,20 @@ class HumanTyperApp(ctk.CTk):
         self._session_chars += chars
         self._session_seconds += seconds
         self._session_last_wpm = wpm
+
+        # Append to recent-session history (keep last 20)
+        hist = self.config.setdefault("session_history", [])
+        hist.insert(0, {
+            "when": _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "chars": int(chars),
+            "seconds": float(seconds),
+            "wpm": float(wpm),
+        })
+        self.config["session_history"] = hist[:20]
+
         self._persist_state()
         self.after(0, self._refresh_stat_cards)
+        self.after(0, self._refresh_history)
 
     def _press_key(self, key_name):
         if _IS_MAC and _MAC_KBD is not None:
@@ -1655,6 +1949,14 @@ class HumanTyperApp(ctk.CTk):
         self._mini_done_var.set(f"{pct:.0f}%")
         self._mini_eta_var.set(eta_str.replace("ETA  ", "") if eta_str else "—")
         self._set_status_main(status, "ok")
+        if getattr(self, "_overlay_win", None) and self._overlay_win.winfo_exists():
+            try:
+                self._overlay_prog.set(pct / 100)
+                self._overlay_wpm.set(wpm_str or "—")
+                self._overlay_eta.set(eta_str.replace("ETA  ", "") if eta_str else "—")
+                self._overlay_pct.set(f"{pct:.0f}%")
+            except Exception:
+                pass
 
     def _done(self, msg, kind="ok"):
         self.after(0, self._done_main, msg, kind)
@@ -1668,6 +1970,285 @@ class HumanTyperApp(ctk.CTk):
         self._pause_btn.configure(state="disabled", text="⏸  Pause  (F6)")
         self._start_btn.configure(state="normal")
         self._typing_active = False
+        self._destroy_overlay()
+
+    # =======================================================================
+    # Text transforms (popup menu in editor toolbar)
+    # =======================================================================
+    def _open_transform_menu(self):
+        menu = tk.Menu(self, tearoff=0)
+        for name, fn in TRANSFORMS:
+            menu.add_command(label=name,
+                             command=lambda f=fn, n=name: self._apply_transform(f, n))
+        try:
+            menu.tk_popup(self.winfo_pointerx(), self.winfo_pointery())
+        finally:
+            menu.grab_release()
+
+    def _apply_transform(self, fn, name):
+        try:
+            sel = self._tb._textbox.get("sel.first", "sel.last")
+            has_sel = True
+        except tk.TclError:
+            sel = self._tb.get("1.0", tk.END).rstrip("\n")
+            has_sel = False
+        if not sel.strip():
+            return
+        new = fn(sel)
+        if has_sel:
+            self._tb._textbox.delete("sel.first", "sel.last")
+            self._tb._textbox.insert("insert", new)
+        else:
+            self._tb.delete("1.0", tk.END)
+            self._tb.insert("1.0", new)
+        self._update_count()
+        self._set_status(f"Transform: {name}", "ok")
+
+    # =======================================================================
+    # Variables menu
+    # =======================================================================
+    def _open_variables_menu(self):
+        menu = tk.Menu(self, tearoff=0)
+        for token, desc in VARIABLES:
+            menu.add_command(label=f"{token}   —   {desc}",
+                             command=lambda t=token: self._insert_variable(t))
+        try:
+            menu.tk_popup(self.winfo_pointerx(), self.winfo_pointery())
+        finally:
+            menu.grab_release()
+
+    def _insert_variable(self, token):
+        try:
+            self._tb._textbox.insert(tk.INSERT, token)
+        except Exception:
+            self._tb.insert(tk.END, token)
+        self._update_count()
+        self._set_status(f"Inserted {token}", "ok")
+
+    # =======================================================================
+    # Dry run preview
+    # =======================================================================
+    def _dry_run(self):
+        text = self._tb.get("1.0", tk.END).rstrip("\n")
+        if not text.strip():
+            messagebox.showwarning("Empty", "Nothing in the editor to preview.")
+            return
+        if self._vars_expand.get():
+            text = expand_variables(text)
+        try:
+            cfg = {k: float(v.get()) for k, v in self._vars.items()}
+        except ValueError:
+            messagebox.showerror("Invalid", "Settings must be numeric.")
+            return
+
+        win = ctk.CTkToplevel(self)
+        win.title("Dry Run — Preview")
+        win.geometry("760x500")
+        win.transient(self)
+
+        ctk.CTkLabel(
+            win, text="🧪  Dry Run preview",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w", padx=14, pady=(14, 0))
+        ctk.CTkLabel(
+            win, text="Types into this window only — no real keystrokes are sent.",
+            text_color="gray60",
+        ).pack(anchor="w", padx=14, pady=(0, 8))
+
+        mono = "Menlo" if _IS_MAC else "Consolas"
+        tb = ctk.CTkTextbox(win, wrap="word",
+                            font=ctk.CTkFont(family=mono, size=13))
+        tb.pack(fill="both", expand=True, padx=14, pady=(0, 8))
+
+        prog = ctk.CTkProgressBar(win, height=6)
+        prog.set(0)
+        prog.pack(fill="x", padx=14, pady=(0, 4))
+
+        status = tk.StringVar(value="Running…")
+        ctk.CTkLabel(win, textvariable=status, text_color="gray60").pack(
+            anchor="w", padx=14, pady=(0, 10))
+
+        stop_flag = {"stop": False}
+
+        def on_close():
+            stop_flag["stop"] = True
+            win.destroy()
+        win.protocol("WM_DELETE_WINDOW", on_close)
+
+        def append(s):
+            tb.insert(tk.END, s)
+            tb.see(tk.END)
+
+        def backspace():
+            tb.delete("end-2c", "end-1c")
+
+        def worker():
+            base = cfg["base_delay"]
+            var = cfg["variation"]
+            punct = cfg["punct_pause"]
+            para = cfg["para_pause"]
+            typo = cfg["typo_chance"]
+            total = len(text)
+            for i, ch in enumerate(text):
+                if stop_flag["stop"]:
+                    return
+                # adjacency typo
+                if typo > 0 and ch.lower() in NEARBY_KEYS and random.random() < typo:
+                    wrong = random.choice(NEARBY_KEYS[ch.lower()])
+                    self.after(0, append, wrong)
+                    time.sleep(base * 1.4)
+                    self.after(0, backspace)
+                    time.sleep(base * 0.8)
+                self.after(0, append, ch)
+                delay = max(0, base + random.uniform(-var, var))
+                if ch in ".!?":
+                    delay += punct
+                elif ch in ";:":
+                    delay += punct * SEMICOLON_PAUSE_FACTOR
+                elif ch == ",":
+                    delay += punct * COMMA_PAUSE_FACTOR
+                elif ch == "\n":
+                    delay += para * 0.2
+                time.sleep(delay)
+                pct = (i + 1) / total
+                self.after(0, prog.set, pct)
+            self.after(0, status.set, "Done ✓")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    # =======================================================================
+    # Schedule typing for later
+    # =======================================================================
+    def _schedule_start(self):
+        if self._typing_active:
+            return
+        if not self._tb.get("1.0", tk.END).strip():
+            messagebox.showwarning("No Text", "Add text to type first.")
+            return
+        dlg = ctk.CTkInputDialog(
+            text="Start typing at (HH:MM, 24-hour) or in (e.g. 30s, 5m):",
+            title="Schedule",
+        )
+        val = (dlg.get_input() or "").strip()
+        if not val:
+            return
+        delay_ms = self._parse_schedule(val)
+        if delay_ms is None:
+            messagebox.showerror("Invalid", "Use HH:MM or e.g. '30s' / '5m'.")
+            return
+        eta = _dt.datetime.now() + _dt.timedelta(milliseconds=delay_ms)
+        self._set_status(
+            f"Scheduled — starts at {eta.strftime('%H:%M:%S')}", "warn")
+        self._schedule_btn.configure(text="🕒  Scheduled…", state="disabled")
+        self.after(delay_ms, self._fire_schedule)
+
+    def _fire_schedule(self):
+        self._schedule_btn.configure(text="🕒  Schedule…", state="normal")
+        self.start_typing()
+
+    def _parse_schedule(self, s):
+        # Duration form
+        m = re.fullmatch(r"(\d+)\s*([smh])", s)
+        if m:
+            n = int(m.group(1))
+            mult = {"s": 1000, "m": 60_000, "h": 3_600_000}[m.group(2)]
+            return n * mult
+        # Time form
+        m = re.fullmatch(r"(\d{1,2}):(\d{2})", s)
+        if m:
+            now = _dt.datetime.now()
+            target = now.replace(hour=int(m.group(1)), minute=int(m.group(2)),
+                                 second=0, microsecond=0)
+            if target <= now:
+                target += _dt.timedelta(days=1)
+            return int((target - now).total_seconds() * 1000)
+        return None
+
+    # =======================================================================
+    # Floating overlay
+    # =======================================================================
+    def _build_overlay(self):
+        w = ctk.CTkToplevel(self)
+        w.title("Human Typer")
+        w.geometry("260x130+40+40")
+        w.attributes("-topmost", True)
+        try:
+            w.overrideredirect(False)
+        except Exception:
+            pass
+        w.transient(self)
+        self._overlay_win = w
+
+        ctk.CTkLabel(
+            w, text="⌨  Typing…",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(anchor="w", padx=14, pady=(10, 0))
+
+        self._overlay_pct = tk.StringVar(value="0%")
+        self._overlay_wpm = tk.StringVar(value="—")
+        self._overlay_eta = tk.StringVar(value="—")
+
+        row = ctk.CTkFrame(w, fg_color="transparent")
+        row.pack(fill="x", padx=14, pady=(4, 6))
+        ctk.CTkLabel(row, textvariable=self._overlay_pct,
+                     font=ctk.CTkFont(size=18, weight="bold")).pack(side="left")
+        ctk.CTkLabel(row, textvariable=self._overlay_wpm,
+                     text_color="gray60").pack(side="right")
+
+        self._overlay_prog = ctk.CTkProgressBar(w, height=8)
+        self._overlay_prog.set(0)
+        self._overlay_prog.pack(fill="x", padx=14)
+
+        ctk.CTkLabel(w, textvariable=self._overlay_eta, text_color="gray60",
+                     font=ctk.CTkFont(size=11)).pack(anchor="e",
+                                                    padx=14, pady=(4, 10))
+
+    def _destroy_overlay(self):
+        w = getattr(self, "_overlay_win", None)
+        if w is not None:
+            try:
+                if w.winfo_exists():
+                    w.destroy()
+            except Exception:
+                pass
+            self._overlay_win = None
+
+    # =======================================================================
+    # Session history
+    # =======================================================================
+    def _refresh_history(self):
+        for child in self._history_frame.winfo_children():
+            child.destroy()
+        hist = self.config.get("session_history", [])
+        if not hist:
+            ctk.CTkLabel(
+                self._history_frame, text="No sessions yet.",
+                text_color="gray55",
+            ).grid(row=0, column=0, sticky="w", padx=10, pady=8)
+            return
+        for i, h in enumerate(hist):
+            row = ctk.CTkFrame(self._history_frame, corner_radius=6)
+            row.grid(row=i, column=0, sticky="ew", padx=4, pady=2)
+            row.grid_columnconfigure(1, weight=1)
+            ctk.CTkLabel(
+                row, text=h.get("when", ""),
+                font=ctk.CTkFont(size=11, weight="bold"),
+            ).grid(row=0, column=0, sticky="w", padx=10, pady=6)
+            ctk.CTkLabel(
+                row,
+                text=f"{h.get('chars', 0):,} chars · "
+                     f"{h.get('wpm', 0):.0f} WPM · "
+                     f"{self._fmt_secs(h.get('seconds', 0))}",
+                text_color="gray60",
+            ).grid(row=0, column=1, sticky="e", padx=10)
+
+    def _clear_history(self):
+        if not messagebox.askyesno(
+                "Clear", "Clear recent-session history?"):
+            return
+        self.config["session_history"] = []
+        self._persist_state()
+        self._refresh_history()
 
 
 if __name__ == "__main__":
