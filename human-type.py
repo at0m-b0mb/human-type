@@ -47,8 +47,10 @@ else:
 CONFIG_PATH = Path.home() / ".humantyper.json"
 
 DEFAULT_CONFIG = {
-    "theme": "Midnight",
-    "dark_mode": True,
+    # Light by default: this is a document tool, and paper reads better for
+    # long text than a dark editor does. Dark is one click away in the rail.
+    "theme": "Royal",
+    "dark_mode": False,
     "recent_files": [],
     "custom_presets": {},
     "custom_snippets": {},
@@ -1306,9 +1308,6 @@ class HumanTyperApp(ctk.CTk):
             row=0, column=2, sticky="e")
 
         self._set_status("Ready.", "ok")
-
-    def _build_status_bar(self, parent):
-        """Kept for compatibility — the status line lives in the action bar."""
 
     # ----- Realism plumbing ------------------------------------------------
     def _update_newline_help(self):
