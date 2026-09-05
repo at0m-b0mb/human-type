@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Human Typer — types text the way a person would</title>
+<meta name="description" content="A desktop app that types text into any window at a human pace: drifting rhythm, per-key effort, and mistakes noticed a beat late — every one of them corrected before the run ends.">
+<meta property="og:title" content="Human Typer">
+<meta property="og:description" content="Types text into any window the way a person would — not the way a machine does.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300"
+     role="img" aria-labelledby="rhythm-title rhythm-desc">
+  <title id="rhythm-title">Keystroke delay over one passage</title>
+  <desc id="rhythm-desc">Keystroke delay on a logarithmic scale. The Robotic
+  profile holds a flat noisy band around eighty milliseconds. The Natural
+  profile drifts around it and spikes into the hundreds where it stops to
+  correct a mistake. Both traces are produced by the typing engine
+  itself.</desc>
+  <style>
+    .grid { stroke: var(--rule, #E4DFD5); stroke-width: 1; }
+    .tick { fill: var(--ink-3, #8A8A97); font: 10px ui-sans-serif, system-ui, sans-serif;
+             text-anchor: end; }
+    .lbl  { font: 600 11px ui-sans-serif, system-ui, sans-serif; }
+    .trace { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+    .robotic { stroke: var(--ink-3, #8A8A97); opacity: .75; }
+    .natural { stroke: var(--accent, #2B3A67); }
+  </style>
+  <line x1="56" y1="241.1" x2="862" y2="241.1" class="grid"/>
+<text x="46" y="245.1" class="tick">25 ms</text>
+<line x1="56" y1="201.0" x2="862" y2="201.0" class="grid"/>
+<text x="46" y="205.0" class="tick">50 ms</text>
+<line x1="56" y1="161.0" x2="862" y2="161.0" class="grid"/>
+<text x="46" y="165.0" class="tick">100 ms</text>
+<line x1="56" y1="120.9" x2="862" y2="120.9" class="grid"/>
+<text x="46" y="124.9" class="tick">200 ms</text>
+<line x1="56" y1="80.9" x2="862" y2="80.9" class="grid"/>
+<text x="46" y="84.9" class="tick">400 ms</text>
+<line x1="56" y1="40.8" x2="862" y2="40.8" class="grid"/>
+<text x="46" y="44.8" class="tick">800 ms</text>
+
+  <path class="trace robotic" d="M 56.0 178.6 L 59.1 197.8 L 62.2 161.4 L 65.3 194.9 L 68.4 170.4 L 71.6 158.4 L 74.7 187.8 L 77.8 195.4 L 80.9 177.5 L 84.0 186.4 L 87.1 171.7 L 90.2 197.1 L 93.3 171.1 L 96.5 157.2 L 99.6 168.5 L 102.7 170.4 L 105.8 196.9 L 108.9 170.3 L 112.0 197.7 L 115.1 187.4 L 118.2 171.5 L 121.4 192.5 L 124.5 177.5 L 127.6 172.1 L 130.7 170.9 L 133.8 171.3 L 136.9 166.5 L 140.0 194.3 L 143.1 170.9 L 146.2 189.3 L 149.4 194.7 L 152.5 165.3 L 155.6 171.2 L 158.7 168.9 L 161.8 174.0 L 164.9 172.5 L 168.0 163.0 L 171.1 175.4 L 174.3 157.9 L 177.4 180.2 L 180.5 186.0 L 183.6 189.8 L 186.7 162.9 L 189.8 195.6 L 192.9 183.3 L 196.0 174.1 L 199.2 181.1 L 202.3 176.1 L 205.4 169.3 L 208.5 196.2 L 211.6 173.4 L 214.7 190.6 L 217.8 181.2 L 220.9 157.6 L 224.0 177.4 L 227.2 156.7 L 230.3 195.9 L 233.4 171.4 L 236.5 162.5 L 239.6 161.5 L 242.7 181.3 L 245.8 180.8 L 248.9 174.0 L 252.1 162.3 L 255.2 196.5 L 258.3 194.9 L 261.4 184.8 L 264.5 165.9 L 267.6 196.7 L 270.7 164.6 L 273.8 182.8 L 276.9 170.6 L 280.1 166.5 L 283.2 176.3 L 286.3 165.2 L 289.4 159.2 L 292.5 180.9 L 295.6 157.4 L 298.7 180.5 L 301.8 169.3 L 305.0 174.2 L 308.1 187.6 L 311.2 183.9 L 314.3 164.4 L 317.4 178.5 L 320.5 158.2 L 323.6 174.0 L 326.7 190.5 L 329.9 178.3 L 333.0 184.4 L 336.1 192.3 L 339.2 177.0 L 342.3 171.7 L 345.4 165.6 L 348.5 155.9 L 351.6 166.5 L 354.7 179.3 L 357.9 186.9 L 361.0 195.6 L 364.1 191.4 L 367.2 167.4 L 370.3 200.2 L 373.4 161.1 L 376.5 189.6 L 379.6 184.2 L 382.8 191.7 L 385.9 172.4 L 389.0 169.3 L 392.1 182.3 L 395.2 192.9 L 398.3 160.1 L 401.4 157.1 L 404.5 167.5 L 407.7 164.3 L 410.8 175.8 L 413.9 159.7 L 417.0 157.0 L 420.1 166.5 L 423.2 171.4 L 426.3 178.5 L 429.4 178.7 L 432.5 174.7 L 435.7 178.4 L 438.8 189.1 L 441.9 156.0 L 445.0 176.5 L 448.1 193.9 L 451.2 169.7 L 454.3 194.3 L 457.4 171.1 L 460.6 172.3 L 463.7 157.1 L 466.8 169.2 L 469.9 196.4 L 473.0 188.2 L 476.1 179.5 L 479.2 168.3 L 482.3 156.9 L 485.5 169.6 L 488.6 175.0 L 491.7 193.6 L 494.8 174.4 L 497.9 156.2 L 501.0 174.7 L 504.1 182.7 L 507.2 191.8 L 510.3 164.0 L 513.5 164.3 L 516.6 174.8 L 519.7 166.1 L 522.8 173.2 L 525.9 188.3 L 529.0 157.0 L 532.1 180.2 L 535.2 166.2 L 538.4 158.2 L 541.5 163.7 L 544.6 183.4 L 547.7 168.0 L 550.8 195.1 L 553.9 160.6 L 557.0 173.1 L 560.1 158.4 L 563.3 180.5 L 566.4 187.4 L 569.5 172.1 L 572.6 173.8 L 575.7 168.3 L 578.8 169.2 L 581.9 162.6 L 585.0 163.6 L 588.1 188.9 L 591.3 186.5 L 594.4 178.4 L 597.5 162.0 L 600.6 188.6 L 603.7 174.2 L 606.8 164.6 L 609.9 155.8 L 613.0 162.5 L 616.2 175.1 L 619.3 189.0 L 622.4 169.5 L 625.5 181.1 L 628.6 161.9 L 631.7 164.9 L 634.8 180.8 L 637.9 156.3 L 641.1 195.7 L 644.2 194.4 L 647.3 175.2 L 650.4 181.4 L 653.5 174.6 L 656.6 155.9 L 659.7 169.3 L 662.8 200.9 L 665.9 158.4 L 669.1 181.1 L 672.2 168.0 L 675.3 160.9 L 678.4 193.3 L 681.5 178.9 L 684.6 165.4 L 687.7 188.7 L 690.8 159.1 L 694.0 176.8 L 697.1 168.3 L 700.2 195.3 L 703.3 157.2 L 706.4 165.0 L 709.5 175.5 L 712.6 164.2 L 715.7 195.4 L 718.8 191.0 L 722.0 155.7 L 725.1 199.2 L 728.2 170.1 L 731.3 175.4 L 734.4 167.5 L 737.5 169.2 L 740.6 169.9 L 743.7 175.0 L 746.9 157.5 L 750.0 191.1 L 753.1 171.8 L 756.2 199.6 L 759.3 162.2 L 762.4 164.8 L 765.5 194.3 L 768.6 164.0 L 771.8 192.1 L 774.9 155.9 L 778.0 188.9 L 781.1 159.6 L 784.2 199.1 L 787.3 187.9 L 790.4 173.8 L 793.5 163.5 L 796.6 182.0 L 799.8 172.0 L 802.9 161.0 L 806.0 197.0 L 809.1 164.3 L 812.2 158.8 L 815.3 167.2 L 818.4 161.6 L 821.5 173.2 L 824.7 161.2 L 827.8 159.5 L 830.9 192.6 L 834.0 191.4 L 837.1 173.4 L 840.2 159.6 L 843.3 163.0 L 846.4 169.4 L 849.6 163.0 L 852.7 191.5 L 855.8 192.0 L 858.9 168.9 L 862.0 193.2"/>
+  <path class="trace natural" d="M 56.0 156.5 L 59.1 164.2 L 62.2 190.1 L 65.3 169.9 L 68.4 169.0 L 71.6 193.6 L 74.7 160.8 L 77.8 167.1 L 80.9 181.7 L 84.0 167.6 L 87.1 201.2 L 90.2 169.4 L 93.3 189.3 L 96.5 172.6 L 99.6 175.9 L 102.7 154.8 L 105.8 164.3 L 108.9 184.5 L 112.0 161.4 L 115.1 178.6 L 118.2 165.3 L 121.4 154.4 L 124.5 136.5 L 127.6 136.6 L 130.7 166.5 L 133.8 146.1 L 136.9 162.9 L 140.0 154.4 L 143.1 149.5 L 146.2 157.6 L 149.4 154.8 L 152.5 155.5 L 155.6 145.6 L 158.7 171.8 L 161.8 150.5 L 164.9 159.7 L 168.0 177.3 L 171.1 174.2 L 174.3 147.5 L 177.4 172.4 L 180.5 185.9 L 183.6 149.6 L 186.7 154.5 L 189.8 146.3 L 192.9 158.2 L 196.0 180.9 L 199.2 54.7 L 202.3 220.1 L 205.4 197.9 L 208.5 191.5 L 211.6 216.5 L 214.7 161.0 L 217.8 180.1 L 220.9 158.1 L 224.0 139.0 L 227.2 146.8 L 230.3 160.6 L 233.4 168.5 L 236.5 169.6 L 239.6 159.4 L 242.7 155.5 L 245.8 163.5 L 248.9 172.4 L 252.1 165.9 L 255.2 156.9 L 258.3 160.2 L 261.4 150.7 L 264.5 181.7 L 267.6 160.5 L 270.7 155.4 L 273.8 181.6 L 276.9 192.4 L 280.1 161.3 L 283.2 179.5 L 286.3 150.5 L 289.4 185.0 L 292.5 170.0 L 295.6 156.1 L 298.7 180.2 L 301.8 138.3 L 305.0 150.2 L 308.1 152.0 L 311.2 144.8 L 314.3 154.7 L 317.4 168.3 L 320.5 170.5 L 323.6 159.6 L 326.7 156.3 L 329.9 156.4 L 333.0 132.6 L 336.1 118.4 L 339.2 147.7 L 342.3 171.6 L 345.4 169.3 L 348.5 139.4 L 351.6 170.7 L 354.7 149.1 L 357.9 139.0 L 361.0 155.1 L 364.1 189.3 L 367.2 162.9 L 370.3 153.0 L 373.4 167.2 L 376.5 171.2 L 379.6 160.7 L 382.8 189.6 L 385.9 163.7 L 389.0 200.2 L 392.1 163.9 L 395.2 187.1 L 398.3 191.0 L 401.4 202.2 L 404.5 198.2 L 407.7 185.1 L 410.8 179.6 L 413.9 188.5 L 417.0 174.9 L 420.1 170.0 L 423.2 148.0 L 426.3 160.6 L 429.4 146.2 L 432.5 151.4 L 435.7 127.7 L 438.8 115.2 L 441.9 125.4 L 445.0 142.2 L 448.1 134.7 L 451.2 139.1 L 454.3 137.1 L 457.4 61.2 L 460.6 192.6 L 463.7 228.6 L 466.8 242.5 L 469.9 200.3 L 473.0 224.9 L 476.1 128.3 L 479.2 105.7 L 482.3 126.1 L 485.5 131.6 L 488.6 126.4 L 491.7 142.1 L 494.8 136.1 L 497.9 138.2 L 501.0 147.6 L 504.1 158.1 L 507.2 162.0 L 510.3 147.8 L 513.5 161.0 L 516.6 164.6 L 519.7 171.5 L 522.8 147.9 L 525.9 165.4 L 529.0 152.1 L 532.1 154.8 L 535.2 158.4 L 538.4 146.8 L 541.5 152.3 L 544.6 185.0 L 547.7 160.9 L 550.8 167.6 L 553.9 194.7 L 557.0 187.2 L 560.1 203.0 L 563.3 95.9 L 566.4 204.7 L 569.5 202.0 L 572.6 234.5 L 575.7 159.4 L 578.8 176.1 L 581.9 144.0 L 585.0 162.2 L 588.1 175.3 L 591.3 152.0 L 594.4 150.7 L 597.5 141.8 L 600.6 137.8 L 603.7 152.4 L 606.8 171.7 L 609.9 168.6 L 613.0 166.1 L 616.2 176.7 L 619.3 145.3 L 622.4 148.6 L 625.5 149.3 L 628.6 146.9 L 631.7 135.7 L 634.8 160.9 L 637.9 129.9 L 641.1 124.8 L 644.2 133.4 L 647.3 137.6 L 650.4 126.4 L 653.5 130.0 L 656.6 177.7 L 659.7 157.5 L 662.8 180.5 L 665.9 163.8 L 669.1 184.4 L 672.2 173.4 L 675.3 151.6 L 678.4 177.1 L 681.5 149.8 L 684.6 138.0 L 687.7 134.8 L 690.8 161.1 L 694.0 160.6 L 697.1 151.6 L 700.2 139.3 L 703.3 140.1 L 706.4 138.0 L 709.5 134.7 L 712.6 142.9 L 715.7 127.2 L 718.8 143.4 L 722.0 140.1 L 725.1 129.6 L 728.2 117.8 L 731.3 122.8 L 734.4 140.0 L 737.5 142.0 L 740.6 130.9 L 743.7 148.7 L 746.9 131.7 L 750.0 155.3 L 753.1 157.2 L 756.2 143.5 L 759.3 132.9 L 762.4 128.4 L 765.5 121.6 L 768.6 135.8 L 771.8 142.5 L 774.9 133.3 L 778.0 123.3 L 781.1 126.1 L 784.2 138.7 L 787.3 134.4 L 790.4 145.2 L 793.5 155.5 L 796.6 135.7 L 799.8 128.7 L 802.9 139.3 L 806.0 131.0 L 809.1 141.5 L 812.2 131.7 L 815.3 136.5 L 818.4 146.1 L 821.5 135.5 L 824.7 150.3 L 827.8 124.9 L 830.9 130.9 L 834.0 136.1 L 837.1 121.7 L 840.2 111.8 L 843.3 126.7 L 846.4 122.6 L 849.6 137.9 L 852.7 129.6 L 855.8 142.3 L 858.9 136.4 L 862.0 147.1"/>
+  <g transform="translate(56,286)">
+    <line x1="0" y1="-4" x2="22" y2="-4" class="trace robotic"/>
+    <text x="28" y="0" class="lbl" fill="var(--ink-2, #565663)">Robotic — jitter around a fixed delay</text>
+    <line x1="270" y1="-4" x2="292" y2="-4" class="trace natural"/>
+    <text x="298" y="0" class="lbl" fill="var(--ink-2, #565663)">Natural — effort, drift, and pauses to fix mistakes</text>
+  </g>
+</svg>">
+<style>
+  :root{
+    --paper:#F3F1EC; --surface:#FFFFFF; --surface-alt:#FAF8F3;
+    --rule:#E4DFD5; --rule-strong:#D2CBBD;
+    --ink:#15151C; --ink-2:#565663; --ink-3:#8A8A97;
+    --accent:#2B3A67; --accent-soft:#E9ECF6; --gold:#9C7B3A;
+    --ok:#2C6A4F; --warn:#8A6410;
+    --serif:"Iowan Old Style",Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --maxw:920px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#0F1015; --surface:#171922; --surface-alt:#1C1F29;
+      --rule:#2B2F3C; --rule-strong:#3A3F4F;
+      --ink:#EDEBE5; --ink-2:#A6A9B6; --ink-3:#71748A;
+      --accent:#8095DC; --accent-soft:#1B2138; --gold:#C9A461;
+      --ok:#5AA783; --warn:#CCA044;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+
+  header{
+    position:sticky; top:0; z-index:10; background:color-mix(in srgb,var(--paper) 88%, transparent);
+    backdrop-filter:saturate(160%) blur(10px); border-bottom:1px solid var(--rule);
+  }
+  header .wrap{display:flex; align-items:center; gap:24px; height:58px}
+  .brand{font-family:var(--serif); font-size:19px; font-weight:700; letter-spacing:.2px}
+  header nav{margin-left:auto; display:flex; gap:22px; flex-wrap:wrap}
+  header nav a{color:var(--ink-2); text-decoration:none; font-size:14px}
+  header nav a:hover{color:var(--ink)}
+
+  .hero{padding:78px 0 54px; border-bottom:1px solid var(--rule)}
+  .eyebrow{
+    font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--gold); margin:0 0 14px;
+  }
+  h1{
+    font-family:var(--serif); font-weight:400; font-size:clamp(38px,6vw,60px);
+    line-height:1.08; margin:0 0 20px; letter-spacing:-.5px;
+  }
+  .lede{font-size:19px; color:var(--ink-2); margin:0 0 28px; max-width:44em}
+  .cta{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+  .btn{
+    display:inline-block; padding:11px 20px; border-radius:8px; text-decoration:none;
+    font-size:15px; border:1px solid transparent;
+  }
+  .btn-primary{background:var(--accent); color:var(--paper)}
+  .btn-primary:hover{opacity:.9}
+  .btn-secondary{border-color:var(--rule-strong); color:var(--ink)}
+  .btn-secondary:hover{background:var(--surface)}
+  code,kbd{font-family:var(--mono); font-size:.9em}
+  .cmd{
+    background:var(--surface); border:1px solid var(--rule); border-radius:8px;
+    padding:11px 16px; color:var(--ink); font-family:var(--mono); font-size:14px;
+  }
+
+  section{padding:64px 0; border-bottom:1px solid var(--rule)}
+  h2{
+    font-family:var(--serif); font-weight:400; font-size:clamp(26px,3.4vw,34px);
+    margin:0 0 10px; letter-spacing:-.2px;
+  }
+  .sub{color:var(--ink-3); margin:0 0 34px; max-width:46em}
+  h3{font-size:16px; margin:0 0 6px}
+  p{margin:0 0 14px}
+
+  .callout{
+    background:var(--accent-soft); border-radius:12px; padding:28px 30px;
+    border:1px solid var(--rule);
+  }
+  .callout .big{font-family:var(--serif); font-size:22px; line-height:1.4; margin:0 0 14px}
+  .callout p:last-child{margin-bottom:0}
+  .callout p{color:var(--ink-2)}
+
+  .grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:22px}
+  .card{
+    background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:24px;
+  }
+  .card p{color:var(--ink-2); font-size:15px; margin:0}
+  .card .n{
+    font-family:var(--serif); font-size:13px; color:var(--gold);
+    display:block; margin-bottom:10px; letter-spacing:.08em;
+  }
+
+  figure{margin:0 0 30px; background:var(--surface); border:1px solid var(--rule);
+         border-radius:12px; padding:20px 18px 12px; overflow-x:auto}
+  figure svg{display:block; width:100%; height:auto; min-width:560px}
+  figcaption{color:var(--ink-3); font-size:13px; padding:6px 4px 2px}
+
+  .tablewrap{overflow-x:auto; border:1px solid var(--rule); border-radius:12px; background:var(--surface)}
+  table{border-collapse:collapse; width:100%; font-size:15px; min-width:520px}
+  th,td{text-align:left; padding:13px 18px; border-bottom:1px solid var(--rule)}
+  tr:last-child td{border-bottom:none}
+  th{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); font-weight:700}
+  td.num{text-align:right; font-variant-numeric:tabular-nums}
+  .good{color:var(--ok); font-weight:600}
+  .bad{color:var(--warn); font-weight:600}
+  td strong{font-weight:600}
+
+  footer{padding:44px 0 64px; color:var(--ink-3); font-size:14px}
+  footer a{color:var(--ink-2)}
+  .note{font-size:13px; color:var(--ink-3)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="brand">Human Typer</span>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#estimates">Estimates</a>
+      <a href="#formats">Formats</a>
+      <a href="#start">Get started</a>
+      <a href="https://github.com/at0m-b0mb/human-type">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Desktop app · macOS · Windows · Linux</p>
+    <h1>Types text the way a&nbsp;person would.</h1>
+    <p class="lede">
+      Some windows will not take a paste — kiosk forms, remote consoles, legacy
+      apps, demo recordings where a wall of text appearing at once looks wrong.
+      Human Typer types it in instead, with drifting rhythm, per-key effort, and
+      mistakes noticed a beat late rather than instantly.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/at0m-b0mb/human-type">View on GitHub</a>
+      <span class="cmd">python human-type.py</span>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <div class="callout">
+      <p class="big">The text that lands in the other window is byte-identical to the text you gave it.</p>
+      <p>
+        The engine invents typos, transpositions and missed shifts, then notices
+        each one a few characters later, backspaces and retypes it — because
+        that is what people do. The realism lives in the timing and the
+        keystrokes, never in the finished document.
+      </p>
+      <p>
+        A property test replays every event stream across every profile, every
+        seed and an adversarial corpus, and asserts the result reconstructs the
+        input exactly. A second proves a correction can never backspace across a
+        line break, which in a chat box would send a half-written message.
+      </p>
+      <p class="note">
+        This makes typing look human. It does not make writing look
+        human-written, and it has no mode that does.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>What makes it look human</h2>
+    <p class="sub">
+      Most typing simulators pick a delay and add random jitter. That is the one
+      thing real typing never does — the jitter is independent from key to key,
+      which reads as a machine adding noise.
+    </p>
+
+    <figure>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300"
+     role="img" aria-labelledby="rhythm-title rhythm-desc">
+  <title id="rhythm-title">Keystroke delay over one passage</title>
+  <desc id="rhythm-desc">Keystroke delay on a logarithmic scale. The Robotic
+  profile holds a flat noisy band around eighty milliseconds. The Natural
+  profile drifts around it and spikes into the hundreds where it stops to
+  correct a mistake. Both traces are produced by the typing engine
+  itself.</desc>
+  <style>
+    .grid { stroke: var(--rule); stroke-width: 1; }
+    .tick { fill: var(--ink-3); font: 10px ui-sans-serif, system-ui, sans-serif;
+             text-anchor: end; }
+    .lbl  { font: 600 11px ui-sans-serif, system-ui, sans-serif; }
+    .trace { fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+    .robotic { stroke: var(--ink-3); opacity: .75; }
+    .natural { stroke: var(--accent); }
+  </style>
+  <line x1="56" y1="241.1" x2="862" y2="241.1" class="grid"/>
+<text x="46" y="245.1" class="tick">25 ms</text>
+<line x1="56" y1="201.0" x2="862" y2="201.0" class="grid"/>
+<text x="46" y="205.0" class="tick">50 ms</text>
+<line x1="56" y1="161.0" x2="862" y2="161.0" class="grid"/>
+<text x="46" y="165.0" class="tick">100 ms</text>
+<line x1="56" y1="120.9" x2="862" y2="120.9" class="grid"/>
+<text x="46" y="124.9" class="tick">200 ms</text>
+<line x1="56" y1="80.9" x2="862" y2="80.9" class="grid"/>
+<text x="46" y="84.9" class="tick">400 ms</text>
+<line x1="56" y1="40.8" x2="862" y2="40.8" class="grid"/>
+<text x="46" y="44.8" class="tick">800 ms</text>
+
+  <path class="trace robotic" d="M 56.0 178.6 L 59.1 197.8 L 62.2 161.4 L 65.3 194.9 L 68.4 170.4 L 71.6 158.4 L 74.7 187.8 L 77.8 195.4 L 80.9 177.5 L 84.0 186.4 L 87.1 171.7 L 90.2 197.1 L 93.3 171.1 L 96.5 157.2 L 99.6 168.5 L 102.7 170.4 L 105.8 196.9 L 108.9 170.3 L 112.0 197.7 L 115.1 187.4 L 118.2 171.5 L 121.4 192.5 L 124.5 177.5 L 127.6 172.1 L 130.7 170.9 L 133.8 171.3 L 136.9 166.5 L 140.0 194.3 L 143.1 170.9 L 146.2 189.3 L 149.4 194.7 L 152.5 165.3 L 155.6 171.2 L 158.7 168.9 L 161.8 174.0 L 164.9 172.5 L 168.0 163.0 L 171.1 175.4 L 174.3 157.9 L 177.4 180.2 L 180.5 186.0 L 183.6 189.8 L 186.7 162.9 L 189.8 195.6 L 192.9 183.3 L 196.0 174.1 L 199.2 181.1 L 202.3 176.1 L 205.4 169.3 L 208.5 196.2 L 211.6 173.4 L 214.7 190.6 L 217.8 181.2 L 220.9 157.6 L 224.0 177.4 L 227.2 156.7 L 230.3 195.9 L 233.4 171.4 L 236.5 162.5 L 239.6 161.5 L 242.7 181.3 L 245.8 180.8 L 248.9 174.0 L 252.1 162.3 L 255.2 196.5 L 258.3 194.9 L 261.4 184.8 L 264.5 165.9 L 267.6 196.7 L 270.7 164.6 L 273.8 182.8 L 276.9 170.6 L 280.1 166.5 L 283.2 176.3 L 286.3 165.2 L 289.4 159.2 L 292.5 180.9 L 295.6 157.4 L 298.7 180.5 L 301.8 169.3 L 305.0 174.2 L 308.1 187.6 L 311.2 183.9 L 314.3 164.4 L 317.4 178.5 L 320.5 158.2 L 323.6 174.0 L 326.7 190.5 L 329.9 178.3 L 333.0 184.4 L 336.1 192.3 L 339.2 177.0 L 342.3 171.7 L 345.4 165.6 L 348.5 155.9 L 351.6 166.5 L 354.7 179.3 L 357.9 186.9 L 361.0 195.6 L 364.1 191.4 L 367.2 167.4 L 370.3 200.2 L 373.4 161.1 L 376.5 189.6 L 379.6 184.2 L 382.8 191.7 L 385.9 172.4 L 389.0 169.3 L 392.1 182.3 L 395.2 192.9 L 398.3 160.1 L 401.4 157.1 L 404.5 167.5 L 407.7 164.3 L 410.8 175.8 L 413.9 159.7 L 417.0 157.0 L 420.1 166.5 L 423.2 171.4 L 426.3 178.5 L 429.4 178.7 L 432.5 174.7 L 435.7 178.4 L 438.8 189.1 L 441.9 156.0 L 445.0 176.5 L 448.1 193.9 L 451.2 169.7 L 454.3 194.3 L 457.4 171.1 L 460.6 172.3 L 463.7 157.1 L 466.8 169.2 L 469.9 196.4 L 473.0 188.2 L 476.1 179.5 L 479.2 168.3 L 482.3 156.9 L 485.5 169.6 L 488.6 175.0 L 491.7 193.6 L 494.8 174.4 L 497.9 156.2 L 501.0 174.7 L 504.1 182.7 L 507.2 191.8 L 510.3 164.0 L 513.5 164.3 L 516.6 174.8 L 519.7 166.1 L 522.8 173.2 L 525.9 188.3 L 529.0 157.0 L 532.1 180.2 L 535.2 166.2 L 538.4 158.2 L 541.5 163.7 L 544.6 183.4 L 547.7 168.0 L 550.8 195.1 L 553.9 160.6 L 557.0 173.1 L 560.1 158.4 L 563.3 180.5 L 566.4 187.4 L 569.5 172.1 L 572.6 173.8 L 575.7 168.3 L 578.8 169.2 L 581.9 162.6 L 585.0 163.6 L 588.1 188.9 L 591.3 186.5 L 594.4 178.4 L 597.5 162.0 L 600.6 188.6 L 603.7 174.2 L 606.8 164.6 L 609.9 155.8 L 613.0 162.5 L 616.2 175.1 L 619.3 189.0 L 622.4 169.5 L 625.5 181.1 L 628.6 161.9 L 631.7 164.9 L 634.8 180.8 L 637.9 156.3 L 641.1 195.7 L 644.2 194.4 L 647.3 175.2 L 650.4 181.4 L 653.5 174.6 L 656.6 155.9 L 659.7 169.3 L 662.8 200.9 L 665.9 158.4 L 669.1 181.1 L 672.2 168.0 L 675.3 160.9 L 678.4 193.3 L 681.5 178.9 L 684.6 165.4 L 687.7 188.7 L 690.8 159.1 L 694.0 176.8 L 697.1 168.3 L 700.2 195.3 L 703.3 157.2 L 706.4 165.0 L 709.5 175.5 L 712.6 164.2 L 715.7 195.4 L 718.8 191.0 L 722.0 155.7 L 725.1 199.2 L 728.2 170.1 L 731.3 175.4 L 734.4 167.5 L 737.5 169.2 L 740.6 169.9 L 743.7 175.0 L 746.9 157.5 L 750.0 191.1 L 753.1 171.8 L 756.2 199.6 L 759.3 162.2 L 762.4 164.8 L 765.5 194.3 L 768.6 164.0 L 771.8 192.1 L 774.9 155.9 L 778.0 188.9 L 781.1 159.6 L 784.2 199.1 L 787.3 187.9 L 790.4 173.8 L 793.5 163.5 L 796.6 182.0 L 799.8 172.0 L 802.9 161.0 L 806.0 197.0 L 809.1 164.3 L 812.2 158.8 L 815.3 167.2 L 818.4 161.6 L 821.5 173.2 L 824.7 161.2 L 827.8 159.5 L 830.9 192.6 L 834.0 191.4 L 837.1 173.4 L 840.2 159.6 L 843.3 163.0 L 846.4 169.4 L 849.6 163.0 L 852.7 191.5 L 855.8 192.0 L 858.9 168.9 L 862.0 193.2"/>
+  <path class="trace natural" d="M 56.0 156.5 L 59.1 164.2 L 62.2 190.1 L 65.3 169.9 L 68.4 169.0 L 71.6 193.6 L 74.7 160.8 L 77.8 167.1 L 80.9 181.7 L 84.0 167.6 L 87.1 201.2 L 90.2 169.4 L 93.3 189.3 L 96.5 172.6 L 99.6 175.9 L 102.7 154.8 L 105.8 164.3 L 108.9 184.5 L 112.0 161.4 L 115.1 178.6 L 118.2 165.3 L 121.4 154.4 L 124.5 136.5 L 127.6 136.6 L 130.7 166.5 L 133.8 146.1 L 136.9 162.9 L 140.0 154.4 L 143.1 149.5 L 146.2 157.6 L 149.4 154.8 L 152.5 155.5 L 155.6 145.6 L 158.7 171.8 L 161.8 150.5 L 164.9 159.7 L 168.0 177.3 L 171.1 174.2 L 174.3 147.5 L 177.4 172.4 L 180.5 185.9 L 183.6 149.6 L 186.7 154.5 L 189.8 146.3 L 192.9 158.2 L 196.0 180.9 L 199.2 54.7 L 202.3 220.1 L 205.4 197.9 L 208.5 191.5 L 211.6 216.5 L 214.7 161.0 L 217.8 180.1 L 220.9 158.1 L 224.0 139.0 L 227.2 146.8 L 230.3 160.6 L 233.4 168.5 L 236.5 169.6 L 239.6 159.4 L 242.7 155.5 L 245.8 163.5 L 248.9 172.4 L 252.1 165.9 L 255.2 156.9 L 258.3 160.2 L 261.4 150.7 L 264.5 181.7 L 267.6 160.5 L 270.7 155.4 L 273.8 181.6 L 276.9 192.4 L 280.1 161.3 L 283.2 179.5 L 286.3 150.5 L 289.4 185.0 L 292.5 170.0 L 295.6 156.1 L 298.7 180.2 L 301.8 138.3 L 305.0 150.2 L 308.1 152.0 L 311.2 144.8 L 314.3 154.7 L 317.4 168.3 L 320.5 170.5 L 323.6 159.6 L 326.7 156.3 L 329.9 156.4 L 333.0 132.6 L 336.1 118.4 L 339.2 147.7 L 342.3 171.6 L 345.4 169.3 L 348.5 139.4 L 351.6 170.7 L 354.7 149.1 L 357.9 139.0 L 361.0 155.1 L 364.1 189.3 L 367.2 162.9 L 370.3 153.0 L 373.4 167.2 L 376.5 171.2 L 379.6 160.7 L 382.8 189.6 L 385.9 163.7 L 389.0 200.2 L 392.1 163.9 L 395.2 187.1 L 398.3 191.0 L 401.4 202.2 L 404.5 198.2 L 407.7 185.1 L 410.8 179.6 L 413.9 188.5 L 417.0 174.9 L 420.1 170.0 L 423.2 148.0 L 426.3 160.6 L 429.4 146.2 L 432.5 151.4 L 435.7 127.7 L 438.8 115.2 L 441.9 125.4 L 445.0 142.2 L 448.1 134.7 L 451.2 139.1 L 454.3 137.1 L 457.4 61.2 L 460.6 192.6 L 463.7 228.6 L 466.8 242.5 L 469.9 200.3 L 473.0 224.9 L 476.1 128.3 L 479.2 105.7 L 482.3 126.1 L 485.5 131.6 L 488.6 126.4 L 491.7 142.1 L 494.8 136.1 L 497.9 138.2 L 501.0 147.6 L 504.1 158.1 L 507.2 162.0 L 510.3 147.8 L 513.5 161.0 L 516.6 164.6 L 519.7 171.5 L 522.8 147.9 L 525.9 165.4 L 529.0 152.1 L 532.1 154.8 L 535.2 158.4 L 538.4 146.8 L 541.5 152.3 L 544.6 185.0 L 547.7 160.9 L 550.8 167.6 L 553.9 194.7 L 557.0 187.2 L 560.1 203.0 L 563.3 95.9 L 566.4 204.7 L 569.5 202.0 L 572.6 234.5 L 575.7 159.4 L 578.8 176.1 L 581.9 144.0 L 585.0 162.2 L 588.1 175.3 L 591.3 152.0 L 594.4 150.7 L 597.5 141.8 L 600.6 137.8 L 603.7 152.4 L 606.8 171.7 L 609.9 168.6 L 613.0 166.1 L 616.2 176.7 L 619.3 145.3 L 622.4 148.6 L 625.5 149.3 L 628.6 146.9 L 631.7 135.7 L 634.8 160.9 L 637.9 129.9 L 641.1 124.8 L 644.2 133.4 L 647.3 137.6 L 650.4 126.4 L 653.5 130.0 L 656.6 177.7 L 659.7 157.5 L 662.8 180.5 L 665.9 163.8 L 669.1 184.4 L 672.2 173.4 L 675.3 151.6 L 678.4 177.1 L 681.5 149.8 L 684.6 138.0 L 687.7 134.8 L 690.8 161.1 L 694.0 160.6 L 697.1 151.6 L 700.2 139.3 L 703.3 140.1 L 706.4 138.0 L 709.5 134.7 L 712.6 142.9 L 715.7 127.2 L 718.8 143.4 L 722.0 140.1 L 725.1 129.6 L 728.2 117.8 L 731.3 122.8 L 734.4 140.0 L 737.5 142.0 L 740.6 130.9 L 743.7 148.7 L 746.9 131.7 L 750.0 155.3 L 753.1 157.2 L 756.2 143.5 L 759.3 132.9 L 762.4 128.4 L 765.5 121.6 L 768.6 135.8 L 771.8 142.5 L 774.9 133.3 L 778.0 123.3 L 781.1 126.1 L 784.2 138.7 L 787.3 134.4 L 790.4 145.2 L 793.5 155.5 L 796.6 135.7 L 799.8 128.7 L 802.9 139.3 L 806.0 131.0 L 809.1 141.5 L 812.2 131.7 L 815.3 136.5 L 818.4 146.1 L 821.5 135.5 L 824.7 150.3 L 827.8 124.9 L 830.9 130.9 L 834.0 136.1 L 837.1 121.7 L 840.2 111.8 L 843.3 126.7 L 846.4 122.6 L 849.6 137.9 L 852.7 129.6 L 855.8 142.3 L 858.9 136.4 L 862.0 147.1"/>
+  <g transform="translate(56,286)">
+    <line x1="0" y1="-4" x2="22" y2="-4" class="trace robotic"/>
+    <text x="28" y="0" class="lbl" fill="var(--ink-2)">Robotic — jitter around a fixed delay</text>
+    <line x1="270" y1="-4" x2="292" y2="-4" class="trace natural"/>
+    <text x="298" y="0" class="lbl" fill="var(--ink-2)">Natural — effort, drift, and pauses to fix mistakes</text>
+  </g>
+</svg>
+      <figcaption>
+        Keystroke delay across one passage, logarithmic scale. Both traces come
+        straight out of the engine — the chart is generated by
+        <code>tools/make_rhythm_chart.py</code>, not drawn by hand.
+      </figcaption>
+    </figure>
+
+    <div class="grid2">
+      <div class="card">
+        <span class="n">01</span>
+        <h3>Rhythm that drifts</h3>
+        <p>Speed wanders in runs lasting seconds, not per keystroke — a mean-reverting walk in log space, so cadence has texture and still returns to your set pace. The tests check its autocorrelation is above 0.5: a rhythm, not noise.</p>
+      </div>
+      <div class="card">
+        <span class="n">02</span>
+        <h3>Keys that cost different amounts</h3>
+        <p>A pinky reach to <code>p</code> is slower than <code>a</code>. A question mark costs a shift. The largest real effect is the same finger twice in a row — <code>de</code>, <code>un</code>, <code>ol</code> — and the largest saving is alternating hands.</p>
+      </div>
+      <div class="card">
+        <span class="n">03</span>
+        <h3>Mistakes noticed late</h3>
+        <p>Every other simulator catches its typo on the very next keystroke. Nobody does that. Here a slip runs on for one to eight more characters before your eyes catch up — the clearest tell between a person and a script, and it is a slider.</p>
+      </div>
+      <div class="card">
+        <span class="n">04</span>
+        <h3>Warm-up, fatigue and thinking</h3>
+        <p>The first lines come out cold. Long documents slow down. Bursts of a few words are followed by a breath, and a new sentence sometimes waits while you compose it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Five ways to sound like yourself</h2>
+    <p class="sub">Speed presets set how fast. Profiles set how human.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Profile</th><th>Character</th><th>Typo rate</th><th>Notice delay</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Robotic</strong></td><td>Metronome. No mistakes, no drift.</td><td class="num">0</td><td class="num">—</td></tr>
+          <tr><td><strong>Steady</strong></td><td>A fast touch-typist on a good day.</td><td class="num">0.4%</td><td class="num">0–1</td></tr>
+          <tr><td><strong>Natural</strong></td><td>The default. Drifting cadence, caught typos, thinking beats.</td><td class="num">1.2%</td><td class="num">0–3</td></tr>
+          <tr><td><strong>Hurried</strong></td><td>Slightly ahead of yourself. More slips, noticed later.</td><td class="num">2.8%</td><td class="num">0–5</td></tr>
+          <tr><td><strong>Thoughtful</strong></td><td>Composing as you go. Long pauses, stalls on hard words.</td><td class="num">0.8%</td><td class="num">0–2</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="estimates">
+  <div class="wrap">
+    <h2>Estimates you can plan around</h2>
+    <p class="sub">
+      The old estimate multiplied characters by the base delay, which ignored
+      effort, drift, rests and the seconds spent correcting mistakes. The
+      estimate now plans the document for real and adds up the pauses.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Profile</th><th>Actual</th><th>New estimate</th><th>Old formula</th></tr></thead>
+        <tbody>
+          <tr><td>Robotic</td><td class="num">83.2 s</td><td class="num good">+0.2%</td><td class="num">+0.6%</td></tr>
+          <tr><td>Steady</td><td class="num">99.0 s</td><td class="num good">−2.3%</td><td class="num bad">−15.4%</td></tr>
+          <tr><td>Natural</td><td class="num">152.5 s</td><td class="num good">+2.1%</td><td class="num bad">−45.1%</td></tr>
+          <tr><td>Hurried</td><td class="num">149.6 s</td><td class="num good">+0.2%</td><td class="num bad">−44.0%</td></tr>
+          <tr><td>Thoughtful</td><td class="num">150.8 s</td><td class="num good">−1.9%</td><td class="num bad">−44.5%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:14px">
+      Same 1,150-character passage, 0.08 s base delay, 60 seeds per profile. The
+      engine is importable and needs no GUI, so you can reproduce this yourself.
+    </p>
+  </div>
+</section>
+
+<section id="formats">
+  <div class="wrap">
+    <h2>Open a document, type it somewhere else</h2>
+    <p class="sub">
+      Only the words come across. A keyboard produces characters, so bold,
+      headings, tables, images and fonts have no keystroke equivalent and are
+      left behind.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Format</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>.txt .md .csv .json</code></td><td>Read directly, with encoding fallback</td></tr>
+          <tr><td><code>.docx</code></td><td>Word. Paragraph breaks kept; tracked deletions are not imported</td></tr>
+          <tr><td><code>.odt</code></td><td>OpenDocument and LibreOffice</td></tr>
+          <tr><td><code>.rtf</code></td><td>Control words and font tables stripped</td></tr>
+          <tr><td><code>.html</code></td><td>Tags stripped, block elements become paragraphs</td></tr>
+          <tr><td><code>.pdf</code></td><td>Only when <code>pypdf</code> is installed</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:14px">
+      Everything but PDF is read with the Python standard library, so opening a
+      Word document adds no dependency. Archive members are size-capped before
+      extraction, so a hostile file cannot exhaust memory.
+    </p>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>Get started</h2>
+    <p class="sub">Python 3.9 or newer.</p>
+    <p><span class="cmd">git clone https://github.com/at0m-b0mb/human-type</span></p>
+    <p><span class="cmd">pip install -r requirements.txt</span></p>
+    <p><span class="cmd">python human-type.py</span></p>
+    <p style="margin-top:26px">
+      <kbd>F5</kbd> starts · <kbd>F6</kbd> pauses and resumes · <kbd>Esc</kbd>
+      stops. Moving the mouse to the top-left corner of the screen aborts
+      immediately, at any moment.
+    </p>
+    <p class="note">
+      On macOS, grant Accessibility permission to whatever launches the app, or
+      no keystrokes are sent at all.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Tested where it counts</h2>
+    <p class="sub">
+      The realism engine and the document reader import nothing outside the
+      standard library, so their suites run anywhere Python does — no GUI, no
+      keyboard, no network.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Suite</th><th>Tests</th><th>Covers</th></tr></thead>
+        <tbody>
+          <tr><td><code>test_realism.py</code></td><td class="num">30</td><td>62,119 individual checks — reconstruction, backspace safety, the effort model, rhythm autocorrelation, determinism</td></tr>
+          <tr><td><code>test_docimport.py</code></td><td class="num">26</td><td>Real <code>.docx</code> and <code>.odt</code> archives built in memory, RTF, HTML, encodings, zip bombs</td></tr>
+          <tr><td><code>test_ui.py</code></td><td class="num">14</td><td>Every page builds and shows, every accent applies, settings round-trip</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>
+      MIT licensed · built by
+      <a href="https://github.com/at0m-b0mb">at0m-b0mb</a> ·
+      <a href="https://github.com/at0m-b0mb/human-type">source</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

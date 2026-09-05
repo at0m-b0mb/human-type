@@ -1,0 +1,57 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  engine:
+    # realism.py and docimport.py import nothing outside the standard
+    # library, so this job needs no pip install and no display.
+    name: engine · ${{ matrix.os }} · py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Typing realism engine
+        run: python tests/test_realism.py
+      - name: Document import
+        run: python tests/test_docimport.py
+
+  interface:
+    # The GUI needs a display; Linux gets one from xvfb.
+    name: interface · ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk xvfb
+      - name: Python packages
+        run: pip install -r requirements.txt
+      - name: Interface tests
+        run: xvfb-run -a python tests/test_ui.py
+
+  lint:
+    name: compile check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Byte-compile every module
+        run: python -m compileall -q realism.py docimport.py theme.py human-type.py tests
