@@ -1,4 +1,9 @@
+# Core — needed to run the app
 pyautogui
 pyperclip
 customtkinter>=5.2.2
 pynput>=1.7.7
+
+# Optional — only needed to open PDFs. Everything else (.docx, .odt, .rtf,
+# .html, plain text) is read with the standard library.
+# pypdf>=4.0.0
