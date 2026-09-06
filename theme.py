@@ -16,7 +16,14 @@ used sparingly it reads as considered, used broadly it reads as costume.
 
 import platform
 
-import customtkinter as ctk
+# The palette and the measurements are plain data, so this module has to be
+# importable without a GUI toolkit present — that is what lets the contrast
+# tests run in CI alongside the other dependency-free suites. Only the parts
+# that actually build or query widgets need CustomTkinter.
+try:
+    import customtkinter as ctk
+except ImportError:      # pragma: no cover - exercised by the CI matrix
+    ctk = None
 
 _IS_MAC = platform.system() == "Darwin"
 _IS_WIN = platform.system() == "Windows"
@@ -67,6 +74,10 @@ _font_cache = {}
 
 def font(role):
     """A CTkFont for a named role. Requires a Tk root to already exist."""
+    if ctk is None:
+        raise RuntimeError(
+            "customtkinter is not installed, so fonts cannot be built. "
+            "Colours and measurements in this module work without it.")
     if role not in _font_cache:
         family, size, weight, slant = _TYPE[role]
         _font_cache[role] = ctk.CTkFont(family=family, size=size,
@@ -111,9 +122,10 @@ def resolve(pair):
     Tk canvases and the like take a single string, so they cannot be handed a
     CustomTkinter colour pair and must be redrawn when the mode changes.
     """
-    if isinstance(pair, (list, tuple)):
-        return pair[1] if ctk.get_appearance_mode().lower() == "dark" else pair[0]
-    return pair
+    if not isinstance(pair, (list, tuple)):
+        return pair
+    dark = ctk is not None and ctk.get_appearance_mode().lower() == "dark"
+    return pair[1] if dark else pair[0]
 
 
 # ---------------------------------------------------------------------------
