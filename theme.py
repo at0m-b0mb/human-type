@@ -292,6 +292,57 @@ def segmented_kwargs():
                 font=font("body"))
 
 
+def checkbox_kwargs():
+    return dict(fg_color=accent("accent"), hover_color=accent("accent_hover"),
+                checkmark_color=accent("accent_ink"), border_color=BORDER_STRONG,
+                text_color=INK, font=font("body"), corner_radius=4,
+                border_width=2, checkbox_width=18, checkbox_height=18)
+
+
+def textbox_kwargs():
+    return dict(fg_color=SURFACE_ALT, text_color=INK,
+                border_width=HAIRLINE, border_color=BORDER,
+                corner_radius=RADIUS_CONTROL,
+                scrollbar_button_color=BORDER_STRONG,
+                scrollbar_button_hover_color=INK_3)
+
+
+def progress_kwargs():
+    return dict(fg_color=SURFACE_SUNK, progress_color=accent("accent"),
+                corner_radius=2)
+
+
+def input_dialog_kwargs():
+    """CTkInputDialog builds its own window, so it takes flat overrides."""
+    return dict(
+        fg_color=SURFACE,
+        text_color=INK,
+        button_fg_color=accent("accent"),
+        button_hover_color=accent("accent_hover"),
+        button_text_color=accent("accent_ink"),
+        entry_fg_color=SURFACE_ALT,
+        entry_border_color=BORDER_STRONG,
+        entry_text_color=INK,
+    )
+
+
+def menu_kwargs():
+    """A tk.Menu is a native widget and needs flat colours, not pairs."""
+    return dict(
+        tearoff=0, bd=0, relief="flat",
+        bg=resolve(SURFACE), fg=resolve(INK),
+        activebackground=resolve(accent("accent")),
+        activeforeground=resolve(accent("accent_ink")),
+        activeborderwidth=0,
+        font=(SANS, 13),
+    )
+
+
+# Highlight behind search hits. Yellow on paper, so the text stays black.
+FIND_HIGHLIGHT = ("#F6E27A", "#5E4E12")
+FIND_HIGHLIGHT_INK = ("#15151C", "#F2F0EA")
+
+
 def option_menu_kwargs():
     return dict(fg_color=SURFACE_ALT, button_color=SURFACE_ALT,
                 button_hover_color=BORDER, text_color=INK,

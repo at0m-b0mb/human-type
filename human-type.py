@@ -662,6 +662,65 @@ class HumanTyperApp(ctk.CTk):
             canvas.create_rectangle(x, y, x + bar_w, height,
                                     fill=colour, outline="")
 
+    # ----- Dialog helpers --------------------------------------------------
+    # Secondary windows are the easiest place for a design system to leak. A
+    # CustomTkinter widget with no colours falls back to the toolkit default,
+    # which against warm paper reads as a disabled control rather than a
+    # styled one. Everything below goes through these.
+    def _dialog(self, title, size=None):
+        win = ctk.CTkToplevel(self)
+        win.title(title)
+        if size:
+            win.geometry(size)
+        win.configure(fg_color=T.CANVAS)
+        win.transient(self)
+        return win
+
+    def _fit_dialog(self, win, min_width=420, resizable=False):
+        """Grow the window to whatever its content actually needs.
+
+        Hard-coding a height is how the Find & Replace buttons ended up off
+        the bottom edge: the number was measured against one machine's font
+        metrics, and every other platform renders taller. Asking Tk for the
+        requested size cannot be wrong.
+        """
+        win.update_idletasks()
+        width = max(min_width, win.winfo_reqwidth())
+        height = win.winfo_reqheight()
+        win.geometry("%dx%d" % (width, height))
+        win.minsize(width, height)
+        win.resizable(resizable, resizable)
+        # Centre on the main window rather than the screen corner.
+        try:
+            x = self.winfo_rootx() + (self.winfo_width() - width) // 2
+            y = self.winfo_rooty() + (self.winfo_height() - height) // 3
+            win.geometry("+%d+%d" % (max(0, x), max(0, y)))
+        except Exception:
+            pass
+        return win
+
+    def _dialog_heading(self, parent, title, subtitle=None):
+        head = ctk.CTkFrame(parent, fg_color="transparent")
+        ctk.CTkLabel(head, text=title, font=T.font("card_title"),
+                     text_color=T.INK, anchor="w").pack(anchor="w")
+        if subtitle:
+            ctk.CTkLabel(head, text=subtitle, font=T.font("small"),
+                         text_color=T.INK_3, anchor="w", justify="left",
+                         wraplength=520).pack(anchor="w", pady=(3, 0))
+        return head
+
+    def _ask_text(self, title, prompt):
+        """A themed one-line prompt. Returns the string, or None if cancelled."""
+        dlg = ctk.CTkInputDialog(text=prompt, title=title,
+                                 **T.input_dialog_kwargs())
+        return dlg.get_input()
+
+    def _menu(self):
+        return tk.Menu(self, **T.menu_kwargs())
+
+    def _popup(self, menu):
+        self._popup(menu)
+
     def _show_page(self, key):
         for name, page in self._pages.items():
             if name == key:
@@ -1668,10 +1727,7 @@ class HumanTyperApp(ctk.CTk):
         return items if items else ["— none —"]
 
     def _save_custom_preset(self):
-        dlg = ctk.CTkInputDialog(
-            text="Name for this custom preset:", title="Save Preset",
-        )
-        name = dlg.get_input()
+        name = self._ask_text("Save preset", "Name for this custom preset:")
         if not name:
             return
         try:
@@ -1774,19 +1830,14 @@ class HumanTyperApp(ctk.CTk):
         if not recents:
             messagebox.showinfo("Recent files", "No recent files yet.")
             return
-        menu = tk.Menu(self, tearoff=0)
+        menu = self._menu()
         for path in recents:
             menu.add_command(label=Path(path).name,
                              command=lambda p=path: self._load_path(p))
         menu.add_separator()
         menu.add_command(label="Clear list",
                          command=self._clear_recent)
-        try:
-            x = self.winfo_pointerx()
-            y = self.winfo_pointery()
-            menu.tk_popup(x, y)
-        finally:
-            menu.grab_release()
+        self._popup(menu)
 
     def _clear_recent(self):
         self.config["recent_files"] = []
@@ -1918,70 +1969,120 @@ class HumanTyperApp(ctk.CTk):
     def open_find_replace(self):
         if getattr(self, "_find_win", None) and self._find_win.winfo_exists():
             self._find_win.lift()
+            self._find_win.focus_force()
             return
-        w = ctk.CTkToplevel(self)
-        w.title("Find & Replace")
-        w.geometry("420x180")
-        w.transient(self)
+        w = self._dialog("Find & Replace")
         self._find_win = w
+        w.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(w, text="Find:").grid(row=0, column=0, padx=14, pady=(16, 4), sticky="w")
+        card = ctk.CTkFrame(w, **T.card_kwargs())
+        card.grid(row=0, column=0, sticky="nsew",
+                  padx=T.SPACE["lg"], pady=T.SPACE["lg"])
+        card.grid_columnconfigure(1, weight=1)
+
+        self._dialog_heading(card, "Find & replace",
+                             "Searches the editor on the Compose page.").grid(
+            row=0, column=0, columnspan=2, sticky="ew",
+            padx=T.CARD_PAD, pady=(T.SPACE["lg"], T.SPACE["md"]))
+
         find_var = tk.StringVar()
-        ctk.CTkEntry(w, textvariable=find_var, width=260).grid(
-            row=0, column=1, columnspan=2, padx=(0, 14), pady=(16, 4), sticky="ew")
-
-        ctk.CTkLabel(w, text="Replace:").grid(row=1, column=0, padx=14, pady=4, sticky="w")
         repl_var = tk.StringVar()
-        ctk.CTkEntry(w, textvariable=repl_var, width=260).grid(
-            row=1, column=1, columnspan=2, padx=(0, 14), pady=4, sticky="ew")
-
         case_var = tk.BooleanVar(value=False)
-        ctk.CTkCheckBox(w, text="Match case", variable=case_var).grid(
-            row=2, column=1, sticky="w", pady=(6, 0))
+
+        for row, (label, var) in enumerate(
+                (("Find", find_var), ("Replace with", repl_var)), start=1):
+            ctk.CTkLabel(card, text=label, font=T.font("small"),
+                         text_color=T.INK_2, anchor="w").grid(
+                row=row, column=0, sticky="w", padx=(T.CARD_PAD, T.SPACE["md"]),
+                pady=5)
+            entry = ctk.CTkEntry(card, textvariable=var, **T.entry_kwargs())
+            entry.grid(row=row, column=1, sticky="ew",
+                       padx=(0, T.CARD_PAD), pady=5)
+            if row == 1:
+                entry.focus_set()
+
+        ctk.CTkCheckBox(card, text="Match case", variable=case_var,
+                        **T.checkbox_kwargs()).grid(
+            row=3, column=1, sticky="w", padx=(0, T.CARD_PAD),
+            pady=(T.SPACE["sm"], 0))
+
+        result_var = tk.StringVar(value="")
+        ctk.CTkLabel(card, textvariable=result_var, font=T.font("small"),
+                     text_color=T.INK_3, anchor="w").grid(
+            row=4, column=0, columnspan=2, sticky="w",
+            padx=T.CARD_PAD, pady=(T.SPACE["md"], 0))
 
         def do_find_all():
-            self._tb._textbox.tag_remove("find", "1.0", tk.END)
+            box = self._tb._textbox
+            box.tag_remove("find", "1.0", tk.END)
             needle = find_var.get()
             if not needle:
+                result_var.set("Type something to find.")
                 return
             opts = {"nocase": not case_var.get()}
-            start = "1.0"
-            count = 0
+            start, count = "1.0", 0
             while True:
-                idx = self._tb._textbox.search(needle, start, stopindex=tk.END, **opts)
+                idx = box.search(needle, start, stopindex=tk.END, **opts)
                 if not idx:
                     break
-                end = f"{idx}+{len(needle)}c"
-                self._tb._textbox.tag_add("find", idx, end)
+                end = "%s+%dc" % (idx, len(needle))
+                box.tag_add("find", idx, end)
                 start = end
                 count += 1
-            self._tb._textbox.tag_config("find", background="#ffd166", foreground="black")
-            self._set_status(f"Found {count} match(es).", "ok" if count else "warn")
+            box.tag_config("find",
+                           background=T.resolve(T.FIND_HIGHLIGHT),
+                           foreground=T.resolve(T.FIND_HIGHLIGHT_INK))
+            result_var.set("%s match%s highlighted."
+                           % (format(count, ","), "" if count == 1 else "es")
+                           if count else "No matches.")
+            self._set_status("Found %s match(es)." % format(count, ","),
+                             "ok" if count else "warn")
 
         def do_replace_all():
             text = self._tb.get("1.0", tk.END).rstrip("\n")
             needle = find_var.get()
             if not needle:
+                result_var.set("Type something to find.")
                 return
             if case_var.get():
-                new = text.replace(needle, repl_var.get())
                 n = text.count(needle)
+                new = text.replace(needle, repl_var.get())
             else:
-                pattern = re.compile(re.escape(needle), re.IGNORECASE)
-                new, n = pattern.subn(repl_var.get(), text)
+                new, n = re.compile(re.escape(needle), re.IGNORECASE).subn(
+                    repl_var.get(), text)
+            if not n:
+                result_var.set("Nothing to replace.")
+                self._set_status("No matches to replace.", "warn")
+                return
             self._tb.delete("1.0", tk.END)
             self._tb.insert("1.0", new)
             self._update_count()
-            self._set_status(f"Replaced {n} occurrence(s).", "ok")
+            result_var.set("Replaced %s occurrence%s."
+                           % (format(n, ","), "" if n == 1 else "s"))
+            self._set_status("Replaced %s occurrence(s)." % format(n, ","), "ok")
 
-        ctk.CTkButton(w, text="🔍  Find All", command=do_find_all).grid(
-            row=3, column=1, sticky="e", pady=14)
-        ctk.CTkButton(w, text="✏  Replace All",
-                      fg_color="transparent", border_width=1,
-                      command=do_replace_all).grid(
-            row=3, column=2, sticky="w", padx=(8, 14), pady=14)
+        buttons = ctk.CTkFrame(card, fg_color="transparent")
+        buttons.grid(row=5, column=0, columnspan=2, sticky="ew",
+                     padx=T.CARD_PAD, pady=(T.SPACE["lg"], T.SPACE["lg"]))
+        buttons.grid_columnconfigure(0, weight=1)
 
-        w.grid_columnconfigure(2, weight=1)
+        ctk.CTkButton(buttons, text="Close", width=80, command=w.destroy,
+                      **T.ghost_button_kwargs()).grid(row=0, column=0, sticky="w")
+        ctk.CTkButton(buttons, text="Find all", width=100,
+                      command=do_find_all,
+                      **T.secondary_button_kwargs()).grid(row=0, column=1,
+                                                          padx=(0, T.SPACE["sm"]))
+        replace_btn = ctk.CTkButton(buttons, text="Replace all", width=120,
+                                    command=do_replace_all,
+                                    **T.primary_button_kwargs())
+        replace_btn.grid(row=0, column=2)
+        self._accent_widget(replace_btn, T.primary_button_kwargs)
+
+        w.bind("<Return>", lambda _e: do_find_all())
+        w.bind("<Escape>", lambda _e: w.destroy())
+        self._fit_dialog(w, min_width=480)
+        w.lift()
+        w.focus_force()
 
     # =======================================================================
     # Snippets
@@ -2026,8 +2127,7 @@ class HumanTyperApp(ctk.CTk):
                 pass
 
     def _new_snippet(self):
-        dlg = ctk.CTkInputDialog(text="Snippet name:", title="New Snippet")
-        name = dlg.get_input()
+        name = self._ask_text("New snippet", "Snippet name:")
         if not name:
             return
         if name in BUILTIN_SNIPPETS:
@@ -2089,8 +2189,7 @@ class HumanTyperApp(ctk.CTk):
             messagebox.showwarning("Empty",
                                    "Select text in the editor, or type something first.")
             return
-        dlg = ctk.CTkInputDialog(text="Snippet name:", title="Save as Snippet")
-        name = dlg.get_input()
+        name = self._ask_text("Save as snippet", "Snippet name:")
         if not name:
             return
         if name in BUILTIN_SNIPPETS:
@@ -2482,14 +2581,11 @@ class HumanTyperApp(ctk.CTk):
     # Text transforms (popup menu in editor toolbar)
     # =======================================================================
     def _open_transform_menu(self):
-        menu = tk.Menu(self, tearoff=0)
+        menu = self._menu()
         for name, fn in TRANSFORMS:
             menu.add_command(label=name,
                              command=lambda f=fn, n=name: self._apply_transform(f, n))
-        try:
-            menu.tk_popup(self.winfo_pointerx(), self.winfo_pointery())
-        finally:
-            menu.grab_release()
+        self._popup(menu)
 
     def _apply_transform(self, fn, name):
         try:
@@ -2514,14 +2610,11 @@ class HumanTyperApp(ctk.CTk):
     # Variables menu
     # =======================================================================
     def _open_variables_menu(self):
-        menu = tk.Menu(self, tearoff=0)
+        menu = self._menu()
         for token, desc in VARIABLES:
             menu.add_command(label=f"{token}   —   {desc}",
                              command=lambda t=token: self._insert_variable(t))
-        try:
-            menu.tk_popup(self.winfo_pointerx(), self.winfo_pointery())
-        finally:
-            menu.grab_release()
+        self._popup(menu)
 
     def _insert_variable(self, token):
         try:
@@ -2553,34 +2646,33 @@ class HumanTyperApp(ctk.CTk):
             messagebox.showerror("Invalid", "Settings must be numeric.")
             return
 
-        win = ctk.CTkToplevel(self)
-        win.title("Dry Run — Preview")
-        win.geometry("760x520")
-        win.transient(self)
+        win = self._dialog("Dry run", "780x560")
+        win.minsize(560, 420)
+        win.resizable(True, True)
 
-        ctk.CTkLabel(
-            win, text="🧪  Dry run",
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).pack(anchor="w", padx=14, pady=(14, 0))
-        ctk.CTkLabel(
-            win,
-            text="The exact run that would go to your keyboard, typed into "
-                 "this window instead. No real keystrokes are sent.",
-            text_color="gray60", justify="left", wraplength=720,
-        ).pack(anchor="w", padx=14, pady=(0, 8))
+        card = ctk.CTkFrame(win, **T.card_kwargs())
+        card.pack(fill="both", expand=True,
+                  padx=T.SPACE["lg"], pady=T.SPACE["lg"])
 
-        mono = "Menlo" if _IS_MAC else "Consolas"
-        tb = ctk.CTkTextbox(win, wrap="word",
-                            font=ctk.CTkFont(family=mono, size=13))
-        tb.pack(fill="both", expand=True, padx=14, pady=(0, 8))
+        self._dialog_heading(
+            card, "Dry run",
+            "The exact run that would go to your keyboard, typed into this "
+            "window instead. No real keystrokes are sent.").pack(
+            anchor="w", fill="x", padx=T.CARD_PAD,
+            pady=(T.SPACE["lg"], T.SPACE["md"]))
 
-        prog = ctk.CTkProgressBar(win, height=6)
+        tb = ctk.CTkTextbox(card, wrap="word", font=T.font("editor"),
+                            **T.textbox_kwargs())
+        tb.pack(fill="both", expand=True, padx=T.CARD_PAD, pady=(0, T.SPACE["md"]))
+
+        prog = ctk.CTkProgressBar(card, height=4, **T.progress_kwargs())
         prog.set(0)
-        prog.pack(fill="x", padx=14, pady=(0, 4))
+        prog.pack(fill="x", padx=T.CARD_PAD)
 
         status = tk.StringVar(value="Running…")
-        ctk.CTkLabel(win, textvariable=status, text_color="gray60").pack(
-            anchor="w", padx=14, pady=(0, 10))
+        ctk.CTkLabel(card, textvariable=status, font=T.font("small"),
+                     text_color=T.INK_2, anchor="w").pack(
+            anchor="w", padx=T.CARD_PAD, pady=(T.SPACE["sm"], T.SPACE["lg"]))
 
         stop_flag = {"stop": False}
 
@@ -2646,11 +2738,9 @@ class HumanTyperApp(ctk.CTk):
         if not self._tb.get("1.0", tk.END).strip():
             messagebox.showwarning("No Text", "Add text to type first.")
             return
-        dlg = ctk.CTkInputDialog(
-            text="Start typing at (HH:MM, 24-hour) or in (e.g. 30s, 5m):",
-            title="Schedule",
-        )
-        val = (dlg.get_input() or "").strip()
+        val = (self._ask_text(
+            "Schedule",
+            "Start typing at (HH:MM, 24-hour) or in (e.g. 30s, 5m):") or "").strip()
         if not val:
             return
         delay_ms = self._parse_schedule(val)

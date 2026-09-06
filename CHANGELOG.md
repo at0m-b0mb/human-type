@@ -77,12 +77,22 @@ a testable planner.
 
 ### Fixed
 
+- **Find & Replace was unusable.** Its buttons sat below the bottom edge of a
+  fixed-height window, so Replace all looked absent, and the dialog had never
+  been restyled — it still used the toolkit's default palette, which against
+  warm paper reads as a disabled control. Dialogs now size to their content,
+  and the whole dialog layer goes through the design system.
+- Two regression tests cover the class rather than the instance: one walks
+  every widget and fails if anything still carries a CustomTkinter default
+  colour, the other fails if any control falls outside the window that owns
+  it. Both were verified against the original bug.
+
 - Long settings pages could not be reached below the fold; they scroll now.
 - Navigating back to a scrolling page left the previous one on screen.
 
 ### Tests
 
-- 83 tests across four suites. The engine, document and palette suites need
+- 95 tests across four suites. The engine, document and palette suites need
   no display and no dependencies; CI runs them on macOS, Windows and Linux
   against Python 3.9 and 3.13.
 - The palette suite checks every text pairing against WCAG AA in both themes
