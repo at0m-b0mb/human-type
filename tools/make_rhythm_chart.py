@@ -92,12 +92,12 @@ def main():
   itself.</desc>
   <style>
     .grid {{ stroke: var(--rule, #E4DFD5); stroke-width: 1; }}
-    .tick {{ fill: var(--ink-3, #8A8A97); font: 10px ui-sans-serif, system-ui, sans-serif;
+    .tick {{ fill: var(--ink-3, #6A6A77); font: 10px ui-sans-serif, system-ui, sans-serif;
              text-anchor: end; }}
     .lbl  {{ font: 600 11px ui-sans-serif, system-ui, sans-serif; }}
     .trace {{ fill: none; stroke-width: 1.6; stroke-linejoin: round; }}
-    .robotic {{ stroke: var(--ink-3, #8A8A97); opacity: .75; }}
-    .natural {{ stroke: var(--accent, #2B3A67); }}
+    .robotic {{ stroke: var(--ink-3, #6A6A77); opacity: .75; }}
+    .natural {{ stroke: var(--accent, #8F6B0C); }}
   </style>
   {grid}
   <path class="trace robotic" d="{path_for(robotic)}"/>

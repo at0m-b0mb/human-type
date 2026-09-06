@@ -8,7 +8,7 @@ Drifting rhythm, per-key effort, and mistakes noticed a beat late instead of ins
 Every one of them corrected before the run ends.
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-70%20passing-2C6A4F)](#tests)
+[![Tests](https://img.shields.io/badge/tests-83%20passing-2C6A4F)](#tests)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6B6B76)](#requirements)
 [![License](https://img.shields.io/badge/license-MIT-9C7B3A)](LICENSE)
 
@@ -149,8 +149,22 @@ top-left corner of the screen aborts immediately, at any moment.
 | **Insights** | Lifetime and session totals, accuracy, and a log of recent runs |
 | **About** | Supported formats, variables, shortcuts and the guarantees |
 
-Light and dark, five restrained accents, and every colour defined as a
-light/dark pair so neither theme is an afterthought.
+Light, dark, or **Auto** to follow the operating system. Light is warm paper
+and deep brass; dark is genuinely black, with neutral greys so nothing reads
+as navy. Six restrained accents, gold by default.
+
+Every colour is declared as a light/dark pair at the point of definition, so
+there is no way to add one and forget the dark half — and
+`tests/test_theme.py` holds every text pairing to WCAG AA in both themes,
+which is what keeps a gold accent readable instead of merely pretty.
+
+### The cadence meter
+
+The bars under **THIS RUN** in the sidebar are the one ornament in the app,
+and they are made of real data: each bar is the gap between two keystrokes on
+a logarithmic scale. Idle, it shows the engine's own rhythm for a sample
+phrase. During a run it shows the gaps actually being executed — and the tall
+ones are the moments it notices a typo and stops to fix it.
 
 ### Dry run
 
@@ -211,7 +225,8 @@ make test-engine   # no display and no dependencies required
 |---|---:|---|
 | `tests/test_realism.py` | 30 | 62,119 individual checks — reconstruction, backspace safety, the effort model, rhythm autocorrelation, determinism |
 | `tests/test_docimport.py` | 26 | Real `.docx`/`.odt` archives built in memory, RTF, HTML, encodings, zip bombs |
-| `tests/test_ui.py` | 14 | Every page builds and shows, every accent applies, settings round-trip, and the controls the typing engine reads still exist |
+| `tests/test_theme.py` | 11 | Every text pairing against WCAG AA, in both themes and all six accents |
+| `tests/test_ui.py` | 16 | Every page builds and shows, every accent and appearance mode applies, settings round-trip, and the controls the typing engine reads still exist |
 
 `realism.py` and `docimport.py` import nothing outside the standard library,
 so the engine suites run anywhere Python does — no GUI, no keyboard, no
@@ -242,7 +257,9 @@ human-type.py      The application
 realism.py         Typing realism engine — pure, no GUI, no keyboard
 docimport.py       Document text extraction — standard library only
 theme.py           Design system: colours, type, spacing, widget recipes
-tests/             Engine, document and interface suites
+tests/             Engine, document, palette and interface suites
+tools/             Chart, site and screenshot generators
+docs/              The project site (generated — edit _template.html)
 ```
 
 The realism engine is a planner: it turns text plus a style into a stream of

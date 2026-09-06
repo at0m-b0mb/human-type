@@ -64,6 +64,14 @@ a testable planner.
 - Serif display type for identity and figures, neutral sans for controls.
 - **Newline delivery** is now a choice of Enter, Shift+Enter or skip, rather
   than a switch that silently dropped newlines when off.
+- **Appearance** is Light, Dark or Auto, which follows the operating system.
+  Light and gold are the defaults.
+- The dark theme is genuinely black with neutral greys, rather than the dark
+  blue it started as.
+- **A cadence meter** in the sidebar, built from real data: each bar is the
+  gap between two keystrokes on a log scale — the engine's own rhythm while
+  idle, and the gaps actually being executed during a run.
+- A colophon on the About page, because someone chose the typefaces.
 - Stop and the fail-safe are now responsive during long pauses; previously a
   three-second thinking pause delayed them by up to three seconds.
 
@@ -74,6 +82,8 @@ a testable planner.
 
 ### Tests
 
-- 70 tests across three suites. The engine suites need no display and no
-  dependencies; CI runs them on macOS, Windows and Linux against Python 3.9
-  and 3.13.
+- 83 tests across four suites. The engine, document and palette suites need
+  no display and no dependencies; CI runs them on macOS, Windows and Linux
+  against Python 3.9 and 3.13.
+- The palette suite checks every text pairing against WCAG AA in both themes
+  and all six accents, which is what keeps a gold accent readable.
