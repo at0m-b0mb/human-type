@@ -26,6 +26,8 @@ jobs:
         run: python tests/test_realism.py
       - name: Document import
         run: python tests/test_docimport.py
+      - name: Palette contrast
+        run: python tests/test_theme.py
 
   interface:
     # The GUI needs a display; Linux gets one from xvfb.

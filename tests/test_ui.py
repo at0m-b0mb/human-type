@@ -145,10 +145,33 @@ class InterfaceTests(unittest.TestCase):
                     "Sunset", "something removed"):
             self.assertIn(self.m.resolve_theme(old), theme.ACCENTS)
 
-    def test_both_appearance_modes_apply(self):
-        for mode in ("Light", "Dark"):
+    def test_every_appearance_mode_applies(self):
+        import customtkinter as ctk
+        for mode in self.m.APPEARANCE_MODES:
             self.app._on_mode_change(mode)
             self.app.update_idletasks()
+            self.assertEqual(self.app._appearance, mode)
+        # Auto resolves to whatever the system is doing, so the app must
+        # remember the choice rather than the resolved value.
+        self.app._on_mode_change("Auto")
+        self.assertEqual(self.app._appearance, "Auto")
+        self.assertIn(ctk.get_appearance_mode().lower(), ("light", "dark"))
+
+    def test_appearance_choice_survives_a_restart(self):
+        self.app._on_mode_change("Auto")
+        self.app._persist_state()
+        revived = self.m.HumanTyperApp()
+        try:
+            self.assertEqual(revived._appearance, "Auto")
+            self.assertEqual(revived._mode_seg.get(), "Auto")
+        finally:
+            revived.destroy()
+
+    def test_old_configs_without_an_appearance_key_still_open(self):
+        self.assertEqual(self.m.resolve_appearance(None, True), "Dark")
+        self.assertEqual(self.m.resolve_appearance(None, False), "Light")
+        self.assertEqual(self.m.resolve_appearance("nonsense", True), "Dark")
+        self.assertEqual(self.m.resolve_appearance("Auto", True), "Auto")
 
     def test_accent_registry_is_populated(self):
         """If nothing registered, switching accent would silently do nothing."""

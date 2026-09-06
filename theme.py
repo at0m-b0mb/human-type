@@ -82,69 +82,101 @@ def reset_fonts():
 # ---------------------------------------------------------------------------
 # Neutrals — the paper and the ink
 # ---------------------------------------------------------------------------
+# Light is warm paper. Dark is genuinely black rather than navy: the greys
+# above it are neutral, so nothing in the dark theme reads as blue.
 # (light, dark)
-CANVAS       = ("#F3F1EC", "#0F1015")   # the desk the cards sit on
-SURFACE      = ("#FFFFFF", "#171922")   # a card
-SURFACE_ALT  = ("#FAF8F3", "#1C1F29")   # a well, an input, a nested panel
-SURFACE_SUNK = ("#EFEDE7", "#101219")   # editor gutter, progress trough
-BORDER       = ("#E4DFD5", "#2B2F3C")   # hairline
-BORDER_STRONG = ("#D2CBBD", "#3A3F4F")
+CANVAS       = ("#F3F1EC", "#000000")   # the desk the cards sit on
+SURFACE      = ("#FFFFFF", "#0C0C0D")   # a card
+SURFACE_ALT  = ("#FAF8F3", "#141415")   # a well, an input, a nested panel
+SURFACE_SUNK = ("#EFEDE7", "#060606")   # editor gutter, progress trough
+BORDER       = ("#E4DFD5", "#242425")   # hairline
+BORDER_STRONG = ("#D2CBBD", "#3A3A3C")
 
-INK          = ("#15151C", "#EDEBE5")   # primary text
-INK_2        = ("#565663", "#A6A9B6")   # secondary text
-INK_3        = ("#8A8A97", "#71748A")   # captions, hints, disabled
+INK          = ("#15151C", "#F2F0EA")   # primary text, warm white on black
+INK_2        = ("#565663", "#ABABA7")   # secondary text
+INK_3        = ("#6A6A77", "#8C8C89")   # captions, hints, disabled
 
 # Semantic
-OK      = ("#2C6A4F", "#5AA783")
-WARN    = ("#8A6410", "#CCA044")
-ERR     = ("#97292B", "#E0797B")
-OK_SOFT   = ("#E8F1EC", "#16241E")
-WARN_SOFT = ("#F6EFDD", "#241F13")
-ERR_SOFT  = ("#F7E9E9", "#241618")
+OK      = ("#2C6A4F", "#5FB489")
+WARN    = ("#8A6410", "#D3A648")
+ERR     = ("#97292B", "#E58184")
+OK_SOFT   = ("#E8F1EC", "#0B1610")
+WARN_SOFT = ("#F6EFDD", "#171208")
+ERR_SOFT  = ("#F7E9E9", "#180B0C")
+
+
+def resolve(pair):
+    """Flatten a (light, dark) pair for widgets that need one plain colour.
+
+    Tk canvases and the like take a single string, so they cannot be handed a
+    CustomTkinter colour pair and must be redrawn when the mode changes.
+    """
+    if isinstance(pair, (list, tuple)):
+        return pair[1] if ctk.get_appearance_mode().lower() == "dark" else pair[0]
+    return pair
 
 
 # ---------------------------------------------------------------------------
 # Accents — five restrained choices, no neon
 # ---------------------------------------------------------------------------
 ACCENTS = {
+    # Two golds, deliberately. `gold` is the eyebrow *text* above every page
+    # title, so its light half has to be a deep brass to stay readable on
+    # paper. `shine` is the bright, actually-golden one, used only on marks
+    # that carry no words — the rule under the wordmark and the bar beside the
+    # active navigation item. Neither is the sole indicator of anything: the
+    # active row is also tinted and set in bold.
+    "Gold": {
+        "accent":       ("#8F6B0C", "#E3C168"),
+        "accent_hover": ("#A67F13", "#EFD183"),
+        "accent_soft":  ("#F9F1D9", "#1C1608"),
+        "accent_ink":   ("#FFFFFF", "#0A0A0A"),
+        "gold":         ("#7A5A0E", "#E3C168"),
+        "shine":        ("#C9A227", "#F2D688"),
+    },
     "Royal": {
-        "accent":       ("#2B3A67", "#8095DC"),
+        "accent":       ("#2B3A67", "#8DA0E2"),
         "accent_hover": ("#3A4C85", "#9AACE8"),
-        "accent_soft":  ("#E9ECF6", "#1B2138"),
-        "accent_ink":   ("#FFFFFF", "#0F1015"),
-        "gold":         ("#9C7B3A", "#C9A461"),
+        "accent_soft":  ("#E9ECF6", "#12141F"),
+        "accent_ink":   ("#FFFFFF", "#0A0A0A"),
+        "gold":         ("#7A5E1C", "#C9A461"),
+        "shine":        ("#B8901E", "#DCC07A"),
     },
     "Graphite": {
         "accent":       ("#2E3138", "#9CA3B4"),
         "accent_hover": ("#43474F", "#B3BAC9"),
-        "accent_soft":  ("#ECECEE", "#20232B"),
-        "accent_ink":   ("#FFFFFF", "#0F1015"),
-        "gold":         ("#8C7A50", "#BFAE84"),
+        "accent_soft":  ("#ECECEE", "#1A1A1B"),
+        "accent_ink":   ("#FFFFFF", "#0A0A0A"),
+        "gold":         ("#6B6047", "#BFAE84"),
+        "shine":        ("#9A8C63", "#CFC29B"),
     },
     "Emerald": {
         "accent":       ("#1F4D3D", "#63B294"),
         "accent_hover": ("#2C6551", "#7CC4A9"),
-        "accent_soft":  ("#E7F0EC", "#152520"),
-        "accent_ink":   ("#FFFFFF", "#0F1015"),
-        "gold":         ("#947C3C", "#C4A765"),
+        "accent_soft":  ("#E7F0EC", "#0D1A15"),
+        "accent_ink":   ("#FFFFFF", "#0A0A0A"),
+        "gold":         ("#6E6224", "#C4A765"),
+        "shine":        ("#A8952F", "#D2BE7E"),
     },
     "Burgundy": {
         "accent":       ("#5E2233", "#C4808F"),
         "accent_hover": ("#7A2F43", "#D296A3"),
-        "accent_soft":  ("#F3E9EC", "#251519"),
-        "accent_ink":   ("#FFFFFF", "#0F1015"),
-        "gold":         ("#9A7A3C", "#CBA966"),
+        "accent_soft":  ("#F3E9EC", "#1B0F12"),
+        "accent_ink":   ("#FFFFFF", "#0A0A0A"),
+        "gold":         ("#7C5A22", "#CBA966"),
+        "shine":        ("#BE9430", "#E0BE84"),
     },
     "Slate": {
         "accent":       ("#28454F", "#7FAAB9"),
         "accent_hover": ("#365C69", "#98BECB"),
-        "accent_soft":  ("#E8EEF0", "#162227"),
-        "accent_ink":   ("#FFFFFF", "#0F1015"),
-        "gold":         ("#8E7A45", "#BFA76E"),
+        "accent_soft":  ("#E8EEF0", "#0E181C"),
+        "accent_ink":   ("#FFFFFF", "#0A0A0A"),
+        "gold":         ("#6E6238", "#BFA76E"),
+        "shine":        ("#A89448", "#CFBE8A"),
     },
 }
 
-DEFAULT_ACCENT = "Royal"
+DEFAULT_ACCENT = "Gold"
 
 _active = dict(ACCENTS[DEFAULT_ACCENT])
 
@@ -157,7 +189,7 @@ def set_accent(name):
 
 
 def accent(token="accent"):
-    """One of: accent, accent_hover, accent_soft, accent_ink, gold."""
+    """One of: accent, accent_hover, accent_soft, accent_ink, gold, shine."""
     return _active[token]
 
 

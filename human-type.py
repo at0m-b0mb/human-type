@@ -1,4 +1,6 @@
+import collections
 import json
+import math
 import platform
 import threading
 import time
@@ -49,8 +51,9 @@ CONFIG_PATH = Path.home() / ".humantyper.json"
 DEFAULT_CONFIG = {
     # Light by default: this is a document tool, and paper reads better for
     # long text than a dark editor does. Dark is one click away in the rail.
-    "theme": "Royal",
-    "dark_mode": False,
+    "theme": "Gold",
+    "appearance": "Light",
+    "dark_mode": False,   # kept so older versions still read this file
     "recent_files": [],
     "custom_presets": {},
     "custom_snippets": {},
@@ -129,8 +132,20 @@ DEFAULT_THEME = T.DEFAULT_ACCENT
 # Accent names used before the interface was redesigned.
 LEGACY_THEMES = {
     "Midnight": "Royal", "Dracula": "Royal", "Cyberpunk": "Burgundy",
-    "Forest": "Emerald", "Ocean": "Slate", "Sunset": "Burgundy",
+    "Forest": "Emerald", "Ocean": "Slate", "Sunset": "Gold",
 }
+
+
+# Light, Dark, or follow whatever the operating system is doing.
+APPEARANCE_MODES = {"Light": "light", "Dark": "dark", "Auto": "system"}
+DEFAULT_APPEARANCE = "Light"
+
+
+def resolve_appearance(name, dark_mode_fallback=False):
+    """The saved appearance choice, or one derived from the old boolean."""
+    if name in APPEARANCE_MODES:
+        return name
+    return "Dark" if dark_mode_fallback else "Light"
 
 
 def resolve_theme(name):
@@ -348,9 +363,12 @@ class HumanTyperApp(ctk.CTk):
 
         self.config = load_config()
         # Light is the default: this is a document tool, and paper reads
-        # better for long text than a dark editor does.
-        ctk.set_appearance_mode("dark" if self.config.get("dark_mode", False)
-                                else "light")
+        # better for long text than a dark editor does. "Auto" hands the
+        # decision to the operating system.
+        self._appearance = resolve_appearance(
+            self.config.get("appearance"),
+            self.config.get("dark_mode", False))
+        ctk.set_appearance_mode(APPEARANCE_MODES[self._appearance])
         ctk.set_default_color_theme("blue")
         self._theme_name = resolve_theme(self.config.get("theme", DEFAULT_THEME))
         T.set_accent(self._theme_name)
@@ -461,10 +479,10 @@ class HumanTyperApp(ctk.CTk):
                    padx=T.SPACE["xl"], pady=(T.SPACE["xl"], T.SPACE["lg"]))
         ctk.CTkLabel(brand, text="Human Typer", font=T.font("wordmark"),
                      text_color=T.INK, anchor="w").pack(anchor="w")
-        rule = ctk.CTkFrame(brand, height=2, width=26, corner_radius=1,
-                            fg_color=T.accent("gold"))
-        rule.pack(anchor="w", pady=(6, 6))
-        self._accent_widget(rule, lambda: {"fg_color": T.accent("gold")})
+        rule = ctk.CTkFrame(brand, height=3, width=34, corner_radius=2,
+                            fg_color=T.accent("shine"))
+        rule.pack(anchor="w", pady=(7, 7))
+        self._accent_widget(rule, lambda: {"fg_color": T.accent("shine")})
         ctk.CTkLabel(brand,
                      text="Typing that behaves\nlike a person typing.",
                      font=T.font("small"), text_color=T.INK_3,
@@ -480,7 +498,7 @@ class HumanTyperApp(ctk.CTk):
             row.grid(row=i, column=0, sticky="ew", pady=1)
             row.grid_columnconfigure(1, weight=1)
 
-            mark = ctk.CTkFrame(row, width=3, height=18, corner_radius=2,
+            mark = ctk.CTkFrame(row, width=4, height=20, corner_radius=2,
                                 fg_color="transparent")
             mark.grid(row=0, column=0, sticky="w", padx=(0, 10), pady=9)
 
@@ -506,6 +524,8 @@ class HumanTyperApp(ctk.CTk):
                      text_color=T.INK_3, anchor="w").grid(
             row=1, column=0, columnspan=2, sticky="w", pady=(0, T.SPACE["sm"]))
 
+        self._build_cadence(ledger, row=2)
+
         self._mini_wpm_var = tk.StringVar(value="—")
         self._mini_done_var = tk.StringVar(value="0%")
         self._mini_eta_var = tk.StringVar(value="—")
@@ -515,7 +535,7 @@ class HumanTyperApp(ctk.CTk):
             ("Progress", self._mini_done_var),
             ("Remaining", self._mini_eta_var),
             ("Accuracy", self._mini_acc_var),
-        ], start=2):
+        ], start=3):
             ctk.CTkLabel(ledger, text=label, font=T.font("small"),
                          text_color=T.INK_3, anchor="w").grid(
                 row=r, column=0, sticky="w", pady=3)
@@ -542,13 +562,105 @@ class HumanTyperApp(ctk.CTk):
         self._accent_widget(self._theme_menu, T.option_menu_kwargs)
 
         self._mode_seg = ctk.CTkSegmentedButton(
-            appearance, values=["Light", "Dark"],
+            appearance, values=list(APPEARANCE_MODES.keys()),
             command=self._on_mode_change, height=30,
             **T.segmented_kwargs())
-        self._mode_seg.set("Dark" if ctk.get_appearance_mode().lower() == "dark"
-                           else "Light")
+        self._mode_seg.set(self._appearance)
         self._mode_seg.grid(row=3, column=0, sticky="ew", pady=(T.SPACE["sm"], 0))
         self._accent_widget(self._mode_seg, T.segmented_kwargs)
+        ctk.CTkLabel(appearance, text="Auto follows your system setting.",
+                     font=T.font("micro"), text_color=T.INK_3,
+                     anchor="w").grid(row=4, column=0, sticky="w", pady=(6, 0))
+
+    # ----- Cadence meter ---------------------------------------------------
+    # The one ornament in the app, and it is made of real data: each bar is a
+    # gap between two keystrokes, on a log scale so a correction pause and a
+    # fast roll are both legible. Idle, it shows the engine's own rhythm for a
+    # sample phrase; during a run it shows the gaps actually being executed.
+    CADENCE_BARS = 44
+    CADENCE_MIN_MS = 18.0
+    CADENCE_MAX_MS = 900.0
+
+    def _build_cadence(self, parent, row):
+        self._cadence = collections.deque(maxlen=self.CADENCE_BARS)
+        self._cadence_last_draw = 0.0
+        self._cadence_live = False
+
+        self._cadence_canvas = tk.Canvas(
+            parent, height=38, highlightthickness=0, bd=0,
+            bg=T.resolve(T.SURFACE))
+        self._cadence_canvas.grid(row=row, column=0, columnspan=2, sticky="ew",
+                                  pady=(2, T.SPACE["md"]))
+        self._cadence_canvas.bind("<Configure>", lambda _e: self._cadence_draw())
+        self._cadence_seed()
+
+    def _cadence_seed(self):
+        """Fill the meter with the engine's rhythm for a sample phrase."""
+        try:
+            style = rz.profile("Natural")
+            style.base_delay, style.variation = 0.08, 0.03
+            style.punct_pause = style.para_pause = 0.0
+            gaps = [ev.seconds * 1000.0
+                    for ev in rz.plan("the quick brown fox jumps over it",
+                                      style, random.Random(4))
+                    if isinstance(ev, rz.Pause)]
+        except Exception:
+            gaps = [80.0] * self.CADENCE_BARS
+        self._cadence.clear()
+        for gap in gaps[-self.CADENCE_BARS:]:
+            self._cadence.append(gap)
+        self._cadence_live = False
+        self._cadence_draw()
+
+    def _cadence_push(self, seconds):
+        """Record one executed gap. Called from the typing thread."""
+        self._cadence.append(seconds * 1000.0)
+        now = time.time()
+        if now - self._cadence_last_draw < 0.07:
+            return
+        self._cadence_last_draw = now
+        self._cadence_live = True
+        self.after(0, self._cadence_draw)
+
+    def _cadence_draw(self):
+        canvas = getattr(self, "_cadence_canvas", None)
+        if canvas is None:
+            return
+        try:
+            canvas.delete("all")
+            canvas.configure(bg=T.resolve(T.SURFACE))
+            width = canvas.winfo_width() or 184
+            height = canvas.winfo_height() or 38
+        except tk.TclError:
+            return
+
+        values = list(self._cadence)
+        if not values:
+            return
+        count = len(values)
+        slot = width / self.CADENCE_BARS
+        bar_w = max(2.0, slot - 1.6)
+
+        quiet = T.resolve(T.BORDER_STRONG)
+        recent = T.resolve(T.accent("accent"))
+        newest = T.resolve(T.accent("shine"))
+        lo, hi = math.log10(self.CADENCE_MIN_MS), math.log10(self.CADENCE_MAX_MS)
+
+        for i, ms in enumerate(values):
+            clamped = min(self.CADENCE_MAX_MS, max(self.CADENCE_MIN_MS, ms))
+            t = (math.log10(clamped) - lo) / (hi - lo)
+            bar_h = max(2.0, t * (height - 4))
+            x = (self.CADENCE_BARS - count + i) * slot
+            y = height - bar_h
+            from_end = count - i
+            if self._cadence_live and from_end == 1:
+                colour = newest
+            elif self._cadence_live and from_end <= 6:
+                colour = recent
+            else:
+                colour = quiet
+            canvas.create_rectangle(x, y, x + bar_w, height,
+                                    fill=colour, outline="")
 
     def _show_page(self, key):
         for name, page in self._pages.items():
@@ -560,7 +672,7 @@ class HumanTyperApp(ctk.CTk):
             active = name == key
             row.configure(fg_color=T.accent("accent_soft") if active
                           else "transparent")
-            mark.configure(fg_color=T.accent("gold") if active else "transparent")
+            mark.configure(fg_color=T.accent("shine") if active else "transparent")
             btn.configure(text_color=T.INK if active else T.INK_2,
                           font=T.font("body_bold" if active else "body"),
                           fg_color="transparent")
@@ -1219,10 +1331,29 @@ class HumanTyperApp(ctk.CTk):
                          text_color=T.INK_2, anchor="w").grid(
                 row=i, column=1, sticky="w", pady=3)
 
+        colophon = self._card(
+            page, "Colophon", None,
+            row=3, column=0, sticky="ew", pady=(0, T.SPACE["xl"]))
+        b = colophon.body
+        ctk.CTkLabel(
+            b, font=T.font("small"), text_color=T.INK_2, justify="left",
+            wraplength=780, anchor="w",
+            text="Set in %s for titles and figures, %s for controls, and %s "
+                 "for your text. Warm paper and deep brass in the light "
+                 "theme; true black in the dark one, with neutral greys so "
+                 "nothing reads as navy.\n\n"
+                 "The bars under THIS RUN are not decoration. Each one is the "
+                 "gap between two keystrokes on a logarithmic scale — the "
+                 "engine's own rhythm while it is idle, and the gaps actually "
+                 "being executed while it types. Watch the tall ones: that is "
+                 "the moment it notices a typo and stops to fix it."
+                 % (T.SERIF, T.SANS, T.MONO),
+        ).grid(row=0, column=0, sticky="w")
+
         vars_card = self._card(
             page, "Variables",
             "Drop these into your text; they are replaced the moment typing "
-            "starts.", row=2, column=0, sticky="ew", pady=(0, T.SPACE["xl"]))
+            "starts.", row=4, column=0, sticky="ew", pady=(0, T.SPACE["xl"]))
         b = vars_card.body
         b.grid_columnconfigure(1, weight=1)
         for i, (token, desc) in enumerate(VARIABLES):
@@ -1436,8 +1567,7 @@ class HumanTyperApp(ctk.CTk):
         self._update_count()
         # Apply appearance
         self._apply_theme_colors(self._theme_name)
-        self._mode_seg.set("Dark" if ctk.get_appearance_mode().lower() == "dark"
-                           else "Light")
+        self._mode_seg.set(self._appearance)
 
     def _persist_state(self):
         try:
@@ -1467,6 +1597,9 @@ class HumanTyperApp(ctk.CTk):
                 "separator": self._repeat_sep_var.get(),
             }
             self.config["theme"] = self._theme_name
+            self.config["appearance"] = self._appearance
+            # Resolved value, so an older build reading this file still opens
+            # in something close to what the user last saw.
             self.config["dark_mode"] = ctk.get_appearance_mode().lower() == "dark"
             self.config["draft"] = self._tb.get("1.0", tk.END).rstrip("\n")
             save_config(self.config)
@@ -1508,9 +1641,14 @@ class HumanTyperApp(ctk.CTk):
                 pass
         if hasattr(self, "_current_page"):
             self._show_page(self._current_page)
+        self._cadence_draw()
 
     def _on_mode_change(self, choice):
-        ctk.set_appearance_mode("dark" if choice == "Dark" else "light")
+        self._appearance = resolve_appearance(choice)
+        ctk.set_appearance_mode(APPEARANCE_MODES[self._appearance])
+        # The cadence meter is a Tk canvas, so it holds flat colours and has
+        # to be repainted rather than re-themed.
+        self.after(60, self._cadence_draw)
         self._persist_state()
 
     # =======================================================================
@@ -2138,6 +2276,7 @@ class HumanTyperApp(ctk.CTk):
 
                 if isinstance(ev, rz.Pause):
                     spent += ev.seconds
+                    self._cadence_push(ev.seconds)
                     self._sleep(ev.seconds)
                     continue
                 if isinstance(ev, rz.Note):

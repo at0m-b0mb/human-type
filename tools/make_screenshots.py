@@ -110,7 +110,7 @@ def load_app():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dark", action="store_true", help="capture the dark theme")
-    ap.add_argument("--accent", default="Royal", help="accent name")
+    ap.add_argument("--accent", default="Gold", help="accent name")
     ap.add_argument("--suffix", default="", help="appended to each filename")
     args = ap.parse_args()
 
