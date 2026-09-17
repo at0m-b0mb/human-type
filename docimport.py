@@ -108,6 +108,27 @@ def _localname(tag):
     return tag.rsplit("}", 1)[-1]
 
 
+# A well-formed .docx or .odt has no document type declaration. A hostile one
+# uses it for entity expansion — the billion-laughs attack. Modern expat caps
+# the amplification, but that cap depends on the expat the interpreter was
+# built against rather than on the Python version, so this does not rely on
+# it. Refusing the DTD is cheap and removes the question.
+_DOCTYPE = re.compile(rb"<!DOCTYPE", re.IGNORECASE)
+
+# A paragraph nests a handful of levels deep in real documents. Thousands of
+# levels is someone trying to exhaust the stack.
+MAX_XML_DEPTH = 100
+
+
+def _reject_doctype(data, what):
+    head = data[:65536] if isinstance(data, bytes) else data[:65536].encode()
+    if _DOCTYPE.search(head):
+        raise UnsupportedDocument(
+            "This %s carries an XML document type declaration. Real documents "
+            "do not, and it is the usual way a file tries to make a parser "
+            "consume all available memory, so it will not be opened." % what)
+
+
 # ---------------------------------------------------------------------------
 # .docx  —  Office Open XML
 # ---------------------------------------------------------------------------
@@ -122,28 +143,40 @@ def _from_docx(data):
                 "renamed, which is a different format entirely.")
         xml = _safe_read(zf, "word/document.xml")
 
+    _reject_doctype(xml, ".docx")
     root = ET.fromstring(xml)
 
     def para_text(node):
-        """Text of one <w:p>, walking runs but stepping over deletions."""
+        """Text of one <w:p>, walking runs but stepping over deletions.
+
+        The walk keeps its own stack rather than recursing: a file nested a
+        few thousand elements deep would otherwise raise RecursionError and
+        take the app down with it.
+        """
         parts = []
-
-        def walk(n):
-            for child in n:
-                name = _localname(child.tag)
-                if name == "del":
-                    # Tracked deletion: this text is not in the document.
-                    continue
-                if name == "t":
-                    parts.append(child.text or "")
-                elif name == "tab":
-                    parts.append("\t")
-                elif name in ("br", "cr"):
-                    parts.append("\n")
-                else:
-                    walk(child)
-
-        walk(node)
+        stack = [(node, 0)]
+        while stack:
+            current, depth = stack.pop()
+            name = _localname(current.tag)
+            if name == "del":
+                # Tracked deletion: this text is not in the document.
+                continue
+            if name == "t":
+                parts.append(current.text or "")
+                continue
+            if name == "tab":
+                parts.append("\t")
+                continue
+            if name in ("br", "cr"):
+                parts.append("\n")
+                continue
+            if depth > MAX_XML_DEPTH:
+                raise UnsupportedDocument(
+                    "This .docx nests elements more than %d levels deep, which "
+                    "no real document does." % MAX_XML_DEPTH)
+            # Pushed in reverse so they pop in document order.
+            for child in reversed(list(current)):
+                stack.append((child, depth + 1))
         return "".join(parts)
 
     paragraphs = [para_text(p) for p in root.iter(_W_NS + "p")]
@@ -159,6 +192,7 @@ def _from_odt(data):
             raise UnsupportedDocument("This .odt has no content.xml.")
         xml = _safe_read(zf, "content.xml")
 
+    _reject_doctype(xml, ".odt")
     root = ET.fromstring(xml)
 
     def text_of(node):

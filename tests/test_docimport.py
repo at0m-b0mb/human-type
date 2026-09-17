@@ -218,6 +218,106 @@ class SafetyTests(unittest.TestCase):
         self.assertIn("pip install pypdf", str(cm.exception))
 
 
+class HostileDocumentTests(unittest.TestCase):
+    """Documents arrive from other people. These are the attacks that matter."""
+
+    W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+    def _docx(self, document_xml):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("word/document.xml", document_xml)
+        return buf.getvalue()
+
+    def test_billion_laughs_is_refused(self):
+        """Nested entities expand to gigabytes and exhaust memory."""
+        bomb = ('<?xml version="1.0"?><!DOCTYPE lolz ['
+                '<!ENTITY lol "lol">'
+                '<!ENTITY lol1 "%s">'
+                ']><w:document xmlns:w="%s"><w:body><w:p><w:r><w:t>&lol1;'
+                '</w:t></w:r></w:p></w:body></w:document>'
+                % ("&lol;" * 10, self.W))
+        with self.assertRaises(D.UnsupportedDocument):
+            D.extract_bytes(self._docx(bomb), ".docx")
+
+    def test_external_entity_cannot_read_local_files(self):
+        xxe = ('<?xml version="1.0"?><!DOCTYPE r [<!ENTITY xxe SYSTEM '
+               '"file:///etc/passwd">]><w:document xmlns:w="%s"><w:body><w:p>'
+               '<w:r><w:t>&xxe;</w:t></w:r></w:p></w:body></w:document>'
+               % self.W)
+        with self.assertRaises(D.UnsupportedDocument):
+            D.extract_bytes(self._docx(xxe), ".docx")
+
+    def test_any_doctype_is_refused(self):
+        """Real documents have none; it is only ever there to attack a parser."""
+        doc = ('<?xml version="1.0"?><!DOCTYPE anything>'
+               '<w:document xmlns:w="%s"><w:body><w:p><w:r><w:t>hi</w:t>'
+               '</w:r></w:p></w:body></w:document>' % self.W)
+        with self.assertRaises(D.UnsupportedDocument) as cm:
+            D.extract_bytes(self._docx(doc), ".docx")
+        self.assertIn("document type declaration", str(cm.exception))
+
+    def test_deep_nesting_does_not_blow_the_stack(self):
+        """A recursive walk raised RecursionError and took the app with it."""
+        depth = 20000
+        doc = ("<w:document xmlns:w='%s'><w:body>" % self.W
+               + "<w:p>" * depth + "<w:r><w:t>x</w:t></w:r>"
+               + "</w:p>" * depth + "</w:body></w:document>")
+        with self.assertRaises(D.UnsupportedDocument) as cm:
+            D.extract_bytes(self._docx(doc), ".docx")
+        self.assertIn("levels deep", str(cm.exception))
+
+    def test_ordinary_nesting_still_works(self):
+        """The depth cap must not reject real documents."""
+        doc = ("<w:document xmlns:w='%s'><w:body><w:tbl><w:tr><w:tc>"
+               "<w:p><w:r><w:t>in a table</w:t></w:r></w:p>"
+               "</w:tc></w:tr></w:tbl></w:body></w:document>" % self.W)
+        self.assertEqual(D.extract_bytes(self._docx(doc), ".docx"), "in a table")
+
+    def test_runs_come_out_in_document_order(self):
+        """An iterative walk is easy to get subtly wrong."""
+        doc = ("<w:document xmlns:w='%s'><w:body><w:p>"
+               "<w:r><w:t>A</w:t></w:r><w:t>B</w:t><w:r><w:t>C</w:t></w:r>"
+               "</w:p></w:body></w:document>" % self.W)
+        self.assertEqual(D.extract_bytes(self._docx(doc), ".docx"), "ABC")
+
+    def test_archive_members_outside_the_document_are_ignored(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("../../../../etc/passwd", "pwned")
+            zf.writestr("word/document.xml",
+                        "<w:document xmlns:w='%s'><w:body><w:p><w:r><w:t>safe"
+                        "</w:t></w:r></w:p></w:body></w:document>" % self.W)
+        self.assertEqual(D.extract_bytes(buf.getvalue(), ".docx"), "safe")
+
+    def test_odt_doctype_is_refused_too(self):
+        content = ('<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e "boom">]>'
+                   "<office:document-content "
+                   "xmlns:office='urn:oasis:names:tc:opendocument:xmlns:office:1.0' "
+                   "xmlns:text='urn:oasis:names:tc:opendocument:xmlns:text:1.0'>"
+                   "<office:body><office:text><text:p>&e;</text:p>"
+                   "</office:text></office:body></office:document-content>")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("content.xml", content)
+        with self.assertRaises(D.UnsupportedDocument):
+            D.extract_bytes(buf.getvalue(), ".odt")
+
+    def test_pathological_rtf_finishes_quickly(self):
+        import time
+        payload = b"{\\rtf1" + b"\\b0" * 100000 + b"}"
+        start = time.time()
+        D.extract_bytes(payload, ".rtf")
+        self.assertLess(time.time() - start, 5.0, "RTF parsing is superlinear")
+
+    def test_pathological_html_finishes_quickly(self):
+        import time
+        payload = b"<div>" * 20000 + b"x" + b"</div>" * 20000
+        start = time.time()
+        D.extract_bytes(payload, ".html")
+        self.assertLess(time.time() - start, 5.0, "HTML parsing is superlinear")
+
+
 class RoundTripTests(unittest.TestCase):
     def test_extract_reads_from_disk(self):
         with tempfile.TemporaryDirectory() as d:

@@ -619,6 +619,50 @@ class TypingRunTests(unittest.TestCase):
         self.assertNotIn("\n", out)
         self.assertEqual(out, "line oneline two")
 
+    def test_closing_mid_run_stops_the_worker(self):
+        """Closing the window during a run must not leave the thread going.
+
+        The worker posts updates with after(); destroying the root underneath
+        it left those firing into a dead interpreter and Tk printed a stream
+        of "invalid command name" errors.
+        """
+        self.app._apply_preset("Slow")
+        self.app._apply_realism_profile("Robotic")
+        self.app._sleep = lambda s: __import__("time").sleep(min(s, 0.01))
+        self.app._tb.delete("1.0", "end")
+        self.app._tb.insert("1.0", "x" * 2000)
+        self.app.start_typing()
+        self.assertFalse(self.app._run_finished.is_set())
+        self.app.after(200, lambda: (self.app._on_close(), self.app.quit()))
+        self.app.mainloop()
+        self.assertTrue(self.app._run_finished.is_set(),
+                        "the typing thread outlived the window")
+        self.assertTrue(self.app._closing)
+
+    def test_cross_thread_updates_go_through_the_guard(self):
+        """Every worker-to-UI hop must use _post, which honours shutdown."""
+        import ast
+        tree = ast.parse((ROOT / "human-type.py").read_text(encoding="utf-8"))
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef))
+        offenders = []
+        for node in cls.body:
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            if node.name in ("_post", "_show_page", "_build_cadence"):
+                continue
+            for sub in ast.walk(node):
+                if (isinstance(sub, ast.Call)
+                        and isinstance(sub.func, ast.Attribute)
+                        and sub.func.attr == "after"
+                        and sub.args
+                        and isinstance(sub.args[0], ast.Constant)
+                        and sub.args[0].value == 0):
+                    offenders.append(node.name)
+        self.assertEqual(
+            offenders, [],
+            "these post to the UI with a raw after(0, ...) instead of _post: %s"
+            % sorted(set(offenders)))
+
     def test_repeat_joins_with_the_separator(self):
         self.app._apply_preset("Blazing")
         self.app._apply_realism_profile("Robotic")
@@ -700,6 +744,157 @@ class ThreadSafetyTests(unittest.TestCase):
                 self.assertIn("args", kwargs)
                 return
         self.fail("start_typing no longer starts a thread")
+
+
+class HostileConfigTests(unittest.TestCase):
+    """A corrupted config file must not lock the user out of the app.
+
+    ~/.humantyper.json is the one input that persists between runs, so it is
+    the one a partial write, a crash, a sync conflict or hand-editing can
+    mangle. Nine different wrong types used to crash on startup with an
+    AttributeError and no way back in. These need no display.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_app_module()
+
+    def _load(self, payload):
+        import json, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "c.json"
+            if isinstance(payload, (bytes, bytearray)):
+                path.write_bytes(payload)
+            else:
+                path.write_text(json.dumps(payload))
+            original = self.m.CONFIG_PATH
+            self.m.CONFIG_PATH = path
+            try:
+                return self.m.load_config()
+            finally:
+                self.m.CONFIG_PATH = original
+
+    def test_wrong_types_fall_back_to_defaults(self):
+        cases = {
+            "stats": "not a dict",
+            "session_history": {"a": 1},
+            "custom_snippets": ["a", "b"],
+            "custom_presets": "nope",
+            "recent_files": 7,
+            "toggles": [1, 2, 3],
+            "last_settings": [1, 2],
+            "repeat": "x",
+            "appearance": {"a": 1},
+            "draft": 12345,
+        }
+        for key, bad in cases.items():
+            cfg = self._load({key: bad})
+            expected = type(self.m.DEFAULT_CONFIG[key])
+            self.assertIsInstance(
+                cfg[key], expected,
+                "%s survived as %r" % (key, type(cfg[key]).__name__))
+
+    def test_nulls_are_replaced(self):
+        cfg = self._load({"stats": None, "toggles": None, "draft": None})
+        self.assertIsInstance(cfg["stats"], dict)
+        self.assertIsInstance(cfg["toggles"], dict)
+        self.assertIsInstance(cfg["draft"], str)
+
+    def test_corrupt_files_load_defaults(self):
+        for blob in (b"{{{{", b"", b"[1,2,3]", b'"hello"', b"null",
+                     b"\x00\x01binary"):
+            cfg = self._load(blob)
+            self.assertIsInstance(cfg, dict)
+            self.assertIn("stats", cfg)
+
+    def test_free_form_containers_are_filtered(self):
+        cfg = self._load({
+            # JSON turns a non-string key into a string, so 7 legitimately
+            # survives as "7"; the dict value is the one to drop.
+            "custom_snippets": {"good": "body", "bad": {"nested": 1}, 7: "x"},
+            "recent_files": ["/a.txt", 5, None, "/b.txt"],
+            "session_history": [{"chars": 1}, "junk", 42],
+        })
+        self.assertEqual(cfg["custom_snippets"], {"good": "body", "7": "x"})
+        self.assertEqual(cfg["recent_files"], ["/a.txt", "/b.txt"])
+        self.assertEqual(cfg["session_history"], [{"chars": 1}])
+
+    def test_unknown_keys_are_kept(self):
+        """Forward compatibility: a newer build's keys must survive."""
+        cfg = self._load({"something_new": {"a": 1}})
+        self.assertEqual(cfg["something_new"], {"a": 1})
+
+    def test_real_settings_still_round_trip(self):
+        cfg = self._load({"theme": "Emerald", "appearance": "Auto",
+                          "rhythm_drift": 0.2, "notice_max": 5,
+                          "last_settings": {"base_delay": "0.05"}})
+        self.assertEqual(cfg["theme"], "Emerald")
+        self.assertEqual(cfg["appearance"], "Auto")
+        self.assertEqual(cfg["rhythm_drift"], 0.2)
+        self.assertEqual(cfg["last_settings"]["base_delay"], "0.05")
+
+
+@unittest.skipUnless(HAVE_DISPLAY, "no display available")
+class InputSafetyTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_app_module()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.m.CONFIG_PATH = Path(cls.tmp.name) / "c.json"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.app = self.m.HumanTyperApp()
+        self.app.update_idletasks()
+
+    def tearDown(self):
+        try:
+            self.app.destroy()
+        except Exception:
+            pass
+
+    def test_schedule_delays_stay_inside_tcl_limits(self):
+        """Tcl's after() takes a 32-bit millisecond count."""
+        for raw in ("25h", "999999h", "99999999999s"):
+            self.assertIsNone(self.app._parse_schedule(raw),
+                              "%s was accepted" % raw)
+        for raw, expect in (("30s", 30000), ("5m", 300000), ("24h", 86400000)):
+            self.assertEqual(self.app._parse_schedule(raw), expect)
+        for raw in ("30s", "24h", "23:59"):
+            delay = self.app._parse_schedule(raw)
+            self.assertLessEqual(delay, 2 ** 31 - 1)
+
+    def test_opening_a_file_with_variables_warns(self):
+        """A file someone else wrote must not silently decide what is typed."""
+        seen = {}
+        # Save the real one first — re-importing the module afterwards would
+        # just hand back the stub, leaking it into every later test.
+        original = self.m.messagebox.showwarning
+        self.m.messagebox.showwarning = lambda t, msg: seen.update(t=t, msg=msg)
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                path = Path(d) / "invoice.txt"
+                path.write_text("Please review. {clipboard}")
+                self.app._vars_expand.set(True)
+                self.app._load_path(str(path))
+                self.assertTrue(seen, "no warning for {clipboard} in a file")
+                self.assertIn("{clipboard}", seen["msg"])
+
+                seen.clear()
+                clean = Path(d) / "clean.txt"
+                clean.write_text("Nothing special here.")
+                self.app._load_path(str(clean))
+                self.assertFalse(seen, "warned about a file with no variables")
+        finally:
+            self.m.messagebox.showwarning = original
+
+    def test_recent_files_list_is_bounded(self):
+        for i in range(200):
+            self.app._push_recent("/tmp/f%d.txt" % i)
+        self.assertLessEqual(len(self.app.config.get("recent_files", [])), 20)
 
 
 class SourceStyleTests(unittest.TestCase):

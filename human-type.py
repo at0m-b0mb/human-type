@@ -99,21 +99,78 @@ DEFAULT_CONFIG = {
 }
 
 
-def load_config():
-    if not CONFIG_PATH.exists():
-        return json.loads(json.dumps(DEFAULT_CONFIG))
-    try:
-        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-        # Deep-merge to keep new keys when upgrading
-        merged = json.loads(json.dumps(DEFAULT_CONFIG))
-        for k, v in data.items():
-            if isinstance(v, dict) and k in merged and isinstance(merged[k], dict):
-                merged[k].update(v)
-            else:
-                merged[k] = v
+def _fresh_defaults():
+    return json.loads(json.dumps(DEFAULT_CONFIG))
+
+
+def _coerce(value, default):
+    """Keep a stored value only when it has the same shape as the default.
+
+    The config file is the one input that persists across runs, so it is also
+    the one that can be corrupted by a partial write, a crash, a bad sync or
+    somebody editing it by hand. Merging blindly meant a single wrong type —
+    "stats" arriving as a string, say — crashed the app on startup with an
+    AttributeError and no way back in. Anything that does not match its
+    default is dropped rather than trusted.
+    """
+    if isinstance(default, dict):
+        if not isinstance(value, dict):
+            return _fresh_defaults() if default is DEFAULT_CONFIG else dict(default)
+        merged = json.loads(json.dumps(default))
+        for key, item in value.items():
+            merged[key] = _coerce(item, merged[key]) if key in merged else item
         return merged
+    if isinstance(default, list):
+        return value if isinstance(value, list) else list(default)
+    if isinstance(default, bool):
+        return value if isinstance(value, bool) else default
+    if isinstance(default, (int, float)):
+        ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        return value if ok else default
+    if isinstance(default, str):
+        return value if isinstance(value, str) else default
+    return value
+
+
+def _sanitize(cfg):
+    """Tidy the free-form containers, whose keys are not known in advance."""
+    snippets = cfg.get("custom_snippets")
+    cfg["custom_snippets"] = (
+        {k: v for k, v in snippets.items()
+         if isinstance(k, str) and isinstance(v, str)}
+        if isinstance(snippets, dict) else {})
+
+    presets = cfg.get("custom_presets")
+    cfg["custom_presets"] = (
+        {k: v for k, v in presets.items()
+         if isinstance(k, str) and isinstance(v, dict)}
+        if isinstance(presets, dict) else {})
+
+    recents = cfg.get("recent_files")
+    cfg["recent_files"] = ([r for r in recents if isinstance(r, str)]
+                           if isinstance(recents, list) else [])
+
+    history = cfg.get("session_history")
+    cfg["session_history"] = ([h for h in history if isinstance(h, dict)]
+                              if isinstance(history, list) else [])
+    return cfg
+
+
+def load_config():
+    """Read the config, falling back to defaults rather than ever raising."""
+    try:
+        if not CONFIG_PATH.exists():
+            return _fresh_defaults()
+        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return _fresh_defaults()
+        merged = _fresh_defaults()
+        for key, value in data.items():
+            merged[key] = (_coerce(value, merged[key]) if key in merged
+                           else value)
+        return _sanitize(merged)
     except Exception:
-        return json.loads(json.dumps(DEFAULT_CONFIG))
+        return _fresh_defaults()
 
 
 def save_config(cfg):
@@ -388,6 +445,9 @@ class HumanTyperApp(ctk.CTk):
         self._typing_active = False
         self._paused_total = 0.0     # seconds spent paused, excluded from WPM
         self._pause_started = None
+        self._closing = False
+        self._run_finished = threading.Event()
+        self._run_finished.set()
 
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.01
@@ -628,7 +688,7 @@ class HumanTyperApp(ctk.CTk):
             return
         self._cadence_last_draw = now
         self._cadence_live = True
-        self.after(0, self._cadence_draw)
+        self._post(self._cadence_draw)
 
     def _cadence_draw(self):
         canvas = getattr(self, "_cadence_canvas", None)
@@ -1687,7 +1747,38 @@ class HumanTyperApp(ctk.CTk):
             pass
 
     def _on_close(self):
-        self._persist_state()
+        """Stop the worker before tearing the window down.
+
+        The typing thread posts its updates with after(). Destroying the root
+        while it is mid-run left those callbacks firing into a dead
+        interpreter, which Tk reports as a stream of "invalid command name"
+        errors. Signalling the thread and giving it a moment to notice costs
+        nothing and keeps the shutdown quiet.
+        """
+        self._stop = True
+        self._pause.set()
+
+        # Let the worker notice, and keep pumping events so the updates it
+        # already queued are delivered while the window is still alive.
+        deadline = time.time() + 1.5
+        while not self._run_finished.is_set() and time.time() < deadline:
+            try:
+                self.update()
+            except tk.TclError:
+                break
+            time.sleep(0.02)
+
+        # Only now refuse new callbacks, and drain whatever is still queued.
+        self._closing = True
+        try:
+            self.update()
+        except tk.TclError:
+            pass
+
+        try:
+            self._persist_state()
+        except Exception:
+            pass
         self.destroy()
 
     # =======================================================================
@@ -1853,6 +1944,23 @@ class HumanTyperApp(ctk.CTk):
         self._tb.insert("1.0", text)
         self._update_count()
         self._push_recent(path)
+
+        # Variables expand at typing time, so tokens inside a file someone
+        # else wrote would decide what gets typed — {clipboard} would put the
+        # clipboard into the target window. The feature stays, but it does not
+        # get to be silent about text the user did not write.
+        tokens = sorted(tok for tok, _desc in VARIABLES if tok in text)
+        if re.search(r"\{random:\d+\}", text) and "{random:6}" not in tokens:
+            tokens.append("{random:N}")
+        if tokens and self._vars_expand.get():
+            messagebox.showwarning(
+                "This file contains variables",
+                "%s contains %s, which will be replaced when typing starts.\n\n"
+                "%s\n\nIf you did not write this file, turn off "
+                "\u201cExpand {variables}\u201d on the Behaviour page before "
+                "you start, or the file decides what gets typed."
+                % (name, "a variable" if len(tokens) == 1 else "variables",
+                   "  ".join(tokens)))
 
         ext = Path(path).suffix.lower()
         if ext in docimport.RICH_EXTENSIONS:
@@ -2399,6 +2507,7 @@ class HumanTyperApp(ctk.CTk):
                 self._done("Stopped.", "warn")
                 return
 
+            self._run_finished.clear()
             total = len(text)
             events = planned if planned is not None else rz.plan(text, style, rng)
             planned_total = (
@@ -2459,6 +2568,21 @@ class HumanTyperApp(ctk.CTk):
             self._done("Fail-safe triggered (mouse moved to corner).", "err")
         except Exception as exc:
             self._done(f"Error: {exc}", "err")
+        finally:
+            self._run_finished.set()
+
+    def _post(self, callback, *args):
+        """Run `callback` on the main thread, unless the window is going away.
+
+        Every cross-thread update goes through here so that a shutdown during
+        a run cannot leave callbacks queued against a destroyed widget.
+        """
+        if getattr(self, "_closing", False):
+            return
+        try:
+            self.after(0, callback, *args)
+        except (tk.TclError, RuntimeError):
+            pass
 
     def _sleep(self, seconds):
         """Sleep, but stay responsive to Stop.
@@ -2513,9 +2637,9 @@ class HumanTyperApp(ctk.CTk):
         # _record_session runs on the typing thread, and _persist_state
         # reads Tk variables and the editor contents, so it has to be handed
         # back to the main thread rather than called here.
-        self.after(0, self._persist_state)
-        self.after(0, self._refresh_stat_cards)
-        self.after(0, self._refresh_history)
+        self._post(self._persist_state)
+        self._post(self._refresh_stat_cards)
+        self._post(self._refresh_history)
 
     def _press_key(self, key_name):
         if key_name == "shift_enter":
@@ -2537,7 +2661,7 @@ class HumanTyperApp(ctk.CTk):
         pyautogui.press(key_name)
 
     def _set_status(self, msg, kind="ok"):
-        self.after(0, self._set_status_main, msg, kind)
+        self._post(self._set_status_main, msg, kind)
 
     def _set_status_main(self, msg, kind):
         self._status_var.set(msg)
@@ -2594,7 +2718,7 @@ class HumanTyperApp(ctk.CTk):
         elif pct > 0 and elapsed > 1:
             eta_str = f"ETA  {self._fmt_secs(elapsed * (100 - pct) / pct)}"
 
-        self.after(0, self._tick_main, pct, wpm_str, eta_str, acc_str,
+        self._post(self._tick_main, pct, wpm_str, eta_str, acc_str,
                    f"Typing… {typed:,} / {total:,} chars ({pct:.0f}%)")
 
     def _tick_main(self, pct, wpm_str, eta_str, acc_str, status):
@@ -2616,7 +2740,7 @@ class HumanTyperApp(ctk.CTk):
                 pass
 
     def _done(self, msg, kind="ok"):
-        self.after(0, self._done_main, msg, kind)
+        self._post(self._done_main, msg, kind)
 
     def _done_main(self, msg, kind):
         self._set_status_main(msg, kind)
@@ -2757,24 +2881,24 @@ class HumanTyperApp(ctk.CTk):
                         time.sleep(min(0.05, max(0.0, end - time.time())))
                     continue
                 if isinstance(ev, rz.Note):
-                    self.after(0, status.set, ev.text)
+                    self._post(status.set, ev.text)
                     continue
                 if isinstance(ev, rz.Char):
-                    self.after(0, append, ev.ch)
+                    self._post(append, ev.ch)
                     keys += 1
                 elif isinstance(ev, rz.Key):
                     if ev.name == "backspace":
-                        self.after(0, backspace)
+                        self._post(backspace)
                         fixes += 1
                     else:
-                        self.after(0, append, "\n")
+                        self._post(append, "\n")
                     keys += 1
                 typed += ev.advance
-                self.after(0, prog.set, typed / total if total else 1)
+                self._post(prog.set, typed / total if total else 1)
             secs = max(0.001, time.time() - t0)
             wpm = (typed / CHARS_PER_WORD) / (secs / 60)
             struck = max(1, keys - fixes)
-            self.after(0, status.set,
+            self._post(status.set,
                        f"Done ✓   {self._fmt_secs(secs)} · {wpm:.0f} WPM · "
                        f"{fixes:,} corrections · "
                        f"{min(100.0, typed / struck * 100.0):.0f}% accuracy")
@@ -2809,13 +2933,19 @@ class HumanTyperApp(ctk.CTk):
         self._schedule_btn.configure(text="🕒  Schedule…", state="normal")
         self.start_typing()
 
+    # Tcl's after() takes a 32-bit millisecond count, so anything past about
+    # 24 days overflows it. A day is already far longer than anyone plausibly
+    # means, and rejecting beyond that is clearer than an overflow.
+    MAX_SCHEDULE_MS = 24 * 60 * 60 * 1000
+
     def _parse_schedule(self, s):
         # Duration form
         m = re.fullmatch(r"(\d+)\s*([smh])", s)
         if m:
             n = int(m.group(1))
             mult = {"s": 1000, "m": 60_000, "h": 3_600_000}[m.group(2)]
-            return n * mult
+            delay = n * mult
+            return delay if delay <= self.MAX_SCHEDULE_MS else None
         # Time form
         m = re.fullmatch(r"(\d{1,2}):(\d{2})", s)
         if m:
@@ -2824,7 +2954,8 @@ class HumanTyperApp(ctk.CTk):
                                  second=0, microsecond=0)
             if target <= now:
                 target += _dt.timedelta(days=1)
-            return int((target - now).total_seconds() * 1000)
+            return min(self.MAX_SCHEDULE_MS,
+                       int((target - now).total_seconds() * 1000))
         return None
 
     # =======================================================================

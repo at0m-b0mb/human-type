@@ -8,7 +8,7 @@ Drifting rhythm, per-key effort, and mistakes noticed a beat late instead of ins
 Every one of them corrected before the run ends.
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-108%20passing-2C6A4F)](#tests)
+[![Tests](https://img.shields.io/badge/tests-129%20passing-2C6A4F)](#tests)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6B6B76)](#requirements)
 [![License](https://img.shields.io/badge/license-MIT-9C7B3A)](LICENSE)
 
@@ -119,8 +119,19 @@ behind.
 | `.pdf` | Only if `pypdf` is installed — see [requirements](#requirements) |
 
 `.docx`, `.odt`, `.rtf` and `.html` are read with the standard library alone —
-importing a Word document adds no dependency. Archive members are size-capped
-before extraction, so a zip bomb cannot exhaust memory.
+importing a Word document adds no dependency.
+
+Documents arrive from other people, so the reader treats them as hostile.
+Archive members are size-capped before extraction, XML document type
+declarations are refused outright (the billion-laughs and XXE vector), element
+nesting is depth-capped so a malformed file cannot exhaust the stack, and only
+the document's own named members are ever read. Each of those has a test that
+fires the actual attack.
+
+One thing worth knowing: `{variables}` expand when typing starts, so a file
+*someone else wrote* could contain `{clipboard}` and put your clipboard into
+the target window. Opening a file that contains variable tokens now says so
+before you start.
 
 ## Quick start
 
@@ -228,9 +239,9 @@ make test-engine   # no display and no dependencies required
 | Suite | Tests | Covers |
 |---|---:|---|
 | `tests/test_realism.py` | 30 | 62,119 individual checks — reconstruction, backspace safety, the effort model, rhythm autocorrelation, determinism |
-| `tests/test_docimport.py` | 26 | Real `.docx`/`.odt` archives built in memory, RTF, HTML, encodings, zip bombs |
+| `tests/test_docimport.py` | 36 | Real `.docx`/`.odt` archives built in memory, RTF, HTML, encodings, zip bombs, entity expansion, XXE, stack exhaustion |
 | `tests/test_theme.py` | 11 | Every text pairing against WCAG AA, in both themes and all six accents |
-| `tests/test_ui.py` | 41 | Every page and dialog builds, nothing falls back to the toolkit's default palette, nothing is clipped out of its own window, settings round-trip, end-to-end typing runs reproduce their input, and the typing thread never touches Tkinter |
+| `tests/test_ui.py` | 52 | Every page and dialog builds, nothing falls back to the toolkit's default palette, nothing is clipped out of its own window, settings round-trip, end-to-end typing runs reproduce their input, the typing thread never touches Tkinter, and a corrupted config never locks you out |
 
 `realism.py` and `docimport.py` import nothing outside the standard library,
 so the engine suites run anywhere Python does — no GUI, no keyboard, no

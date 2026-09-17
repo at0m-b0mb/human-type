@@ -75,7 +75,44 @@ a testable planner.
 - Stop and the fail-safe are now responsive during long pauses; previously a
   three-second thinking pause delayed them by up to three seconds.
 
+### Security
+
+The document reader takes input from other people, so it was attacked
+deliberately rather than reviewed by eye. Five of seven attacks were already
+refused; two were not.
+
+- **Deeply nested XML crashed the app.** The `.docx` walk was recursive, so a
+  file a few thousand elements deep raised `RecursionError`. The walk keeps
+  its own stack now and refuses anything past 100 levels, which no real
+  document reaches.
+- **XML document type declarations are refused outright.** Modern expat caps
+  entity amplification, but that cap depends on the expat the interpreter was
+  built against rather than the Python version, and this project supports 3.9.
+  Real documents carry no DTD, so refusing it removes the question — along
+  with the XXE vector.
+- Confirmed safe and now covered by tests: external entities cannot read local
+  files, zip members outside the document are never read, nothing is extracted
+  to disk, and pathological RTF and HTML stay linear.
+- **A corrupted config file used to lock you out of the app.**
+  `~/.humantyper.json` is the one input that persists between runs, so a
+  partial write or a sync conflict can mangle it. Nine different wrong types
+  crashed on startup with an `AttributeError`. Stored values are now kept only
+  when they match the shape of their default.
+- **Opening a file containing `{variables}` now warns.** They expand when
+  typing starts, so a document someone else wrote could use `{clipboard}` to
+  put your clipboard into the target window. The feature stays; it no longer
+  does that silently.
+- **Scheduled delays are capped at 24 hours.** Tcl's `after()` takes a 32-bit
+  millisecond count, and `999999h` overflowed it.
+
 ### Fixed
+
+- **Closing the window mid-run left the typing thread posting updates into a
+  destroyed interpreter**, which Tk reported as a stream of "invalid command
+  name" errors. Close now signals the worker, drains the queued updates while
+  the window is still alive, and only then tears down. Every cross-thread
+  update goes through one guarded helper, and a test fails if a new raw
+  `after(0, ...)` appears.
 
 - **The typing thread read Tkinter state.** `_run` fetched the newline mode
   from a Tk variable on the worker thread, and `_record_session` reached the
@@ -109,7 +146,7 @@ a testable planner.
 
 ### Tests
 
-- 108 tests across four suites. The engine, document and palette suites need
+- 129 tests across four suites. The engine, document and palette suites need
   no display and no dependencies; CI runs them on macOS, Windows and Linux
   against Python 3.9 and 3.13.
 - The palette suite checks every text pairing against WCAG AA in both themes
