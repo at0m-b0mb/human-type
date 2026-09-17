@@ -131,6 +131,81 @@ class InterfaceTests(unittest.TestCase):
         self.assertEqual(self.app._stat_rows["sentences"].get(), "2")
         self.assertNotEqual(self.app._stat_rows["estimate"].get(), "—")
 
+    # -- speed and realism must not fight over the same field -----------
+    def test_speed_presets_only_set_pace(self):
+        """Two controls writing one field means the last click silently wins.
+
+        Picking Natural then Blazing used to drop the typo rate to zero while
+        the Realism segment still said Natural, so the label lied about the
+        behaviour. Speed owns pace; realism owns mistakes.
+        """
+        for preset in self.m.PRESETS.values():
+            for field in preset:
+                self.assertIn(field, self.m.PRESET_FIELDS,
+                              "%s is a realism concern, not a speed one" % field)
+            self.assertNotIn("typo_chance", preset)
+
+    def test_a_speed_preset_does_not_disturb_the_profile(self):
+        for profile in self.m.REALISM_PROFILES:
+            self.app._apply_realism_profile(profile)
+            expected = self.app._current_style().typo_chance
+            for preset in self.m.PRESETS:
+                self.app._apply_preset(preset)
+                self.assertEqual(
+                    self.app._current_style().typo_chance, expected,
+                    "%s changed the typo rate set by the %s profile"
+                    % (preset, profile))
+
+    def test_speed_presets_still_change_the_pace(self):
+        self.app._tb.delete("1.0", "end")
+        self.app._tb.insert("1.0", "The quick brown fox jumps over the dog. " * 4)
+        self.app._apply_realism_profile("Robotic")
+        import realism as rz
+        seen = {}
+        for preset in ("Slow", "Normal", "Fast", "Blazing"):
+            self.app._apply_preset(preset)
+            seen[preset] = rz.estimate_seconds(
+                self.app._tb.get("1.0", "end"), self.app._current_style(),
+                samples=2)
+        self.assertGreater(seen["Slow"], seen["Normal"])
+        self.assertGreater(seen["Normal"], seen["Fast"])
+        self.assertGreater(seen["Fast"], seen["Blazing"])
+
+    def test_speed_segment_tells_the_truth(self):
+        for preset in self.m.PRESETS:
+            self.app._apply_preset(preset)
+            self.assertEqual(self.app._matching_preset(), preset)
+            self.assertEqual(self.app._preset_seg.get(), preset)
+        # A hand-edited value belongs to no preset, and the segment should
+        # stop claiming one.
+        self.app._vars["base_delay"].set("0.0777")
+        self.app.update_idletasks()
+        self.assertIsNone(self.app._matching_preset())
+        self.assertEqual(self.app._preset_seg.get(), "")
+
+    def test_saved_speed_shows_on_the_segment_after_a_restart(self):
+        self.app._apply_preset("Blazing")
+        self.app._persist_state()
+        revived = self.m.HumanTyperApp()
+        try:
+            revived.update_idletasks()
+            self.assertEqual(revived._vars["base_delay"].get(), "0.01")
+            self.assertEqual(revived._preset_seg.get(), "Blazing")
+        finally:
+            revived.destroy()
+
+    def test_a_hand_tuned_typo_rate_survives_a_restart(self):
+        """The profile resets it, so something has to restore it afterwards."""
+        self.app._apply_realism_profile("Natural")
+        self.app._vars["typo_chance"].set("0.077")
+        self.app._persist_state()
+        revived = self.m.HumanTyperApp()
+        try:
+            revived.update_idletasks()
+            self.assertEqual(revived._vars["typo_chance"].get(), "0.077")
+        finally:
+            revived.destroy()
+
     # -- appearance -----------------------------------------------------
     def test_every_accent_applies_without_error(self):
         import theme
@@ -445,6 +520,186 @@ class StylingTests(unittest.TestCase):
         self.app.update_idletasks()
         self._assert_styled(self.app._overlay_win, "progress overlay")
         self.app._destroy_overlay()
+
+
+@unittest.skipUnless(HAVE_DISPLAY, "no display available")
+class TypingRunTests(unittest.TestCase):
+    """End-to-end runs, with keystroke injection stubbed out.
+
+    These drive a real mainloop, because the typing thread hands its updates
+    back with self.after() and Tkinter only permits that while the loop is
+    running.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_app_module()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.m.CONFIG_PATH = Path(cls.tmp.name) / "config.json"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        # A fresh config per test: start_typing persists settings, so a run
+        # that sets Repeat to 3 would otherwise leak into the next test's
+        # freshly constructed app.
+        self._case_config = Path(self.tmp.name) / ("%s.json" % self.id().split(".")[-1])
+        self.m.CONFIG_PATH = self._case_config
+        self.app = self.m.HumanTyperApp()
+        self.app.update_idletasks()
+        self.typed = []
+        # Nothing may reach the real keyboard from a test.
+        self.app._emit = self.typed.append
+        self.app._press_key = self._fake_key
+        self.app._sleep = lambda _s: None
+        self.app._vars["start_delay"].set("0")
+
+    def tearDown(self):
+        try:
+            self.app.stop_typing()
+        except Exception:
+            pass
+        try:
+            self.app.destroy()
+        except Exception:
+            pass
+
+    def _fake_key(self, name):
+        if name == "backspace":
+            if self.typed:
+                self.typed.pop()
+        elif name in ("enter", "shift_enter"):
+            self.typed.append("\n")
+
+    def _run_to_completion(self, text, timeout=30):
+        import time
+        self.typed.clear()
+        self.app._tb.delete("1.0", "end")
+        self.app._tb.insert("1.0", text)
+        deadline = time.time() + timeout
+
+        def poll():
+            if not self.app._typing_active or time.time() > deadline:
+                self.app.quit()
+                return
+            self.app.after(10, poll)
+
+        self.app.start_typing()
+        self.app.after(10, poll)
+        self.app.mainloop()
+        self.assertFalse(self.app._typing_active, "the run never finished")
+        return "".join(self.typed)
+
+    def test_every_profile_types_the_text_exactly(self):
+        source = "Hello there. This is definitely a test!\n\nSecond paragraph."
+        self.app._apply_preset("Blazing")
+        self.app._newline_var.set("Press Enter")
+        for profile in self.m.REALISM_PROFILES:
+            self.app._apply_realism_profile(profile)
+            self.assertEqual(self._run_to_completion(source), source,
+                             "%s did not reproduce the text" % profile)
+
+    def test_run_reports_done_and_records_a_session(self):
+        self.app._apply_preset("Blazing")
+        self.app._apply_realism_profile("Robotic")
+        before = len(self.app.config.get("session_history", []))
+        self._run_to_completion("A short run.")
+        self.app.update()
+        self.assertIn("Done", self.app._status_var.get())
+        self.assertEqual(len(self.app.config.get("session_history", [])),
+                         before + 1)
+
+    def test_skip_mode_sends_no_newline(self):
+        self.app._apply_preset("Blazing")
+        self.app._apply_realism_profile("Robotic")
+        self.app._newline_var.set("Skip (join)")
+        out = self._run_to_completion("line one\nline two")
+        self.assertNotIn("\n", out)
+        self.assertEqual(out, "line oneline two")
+
+    def test_repeat_joins_with_the_separator(self):
+        self.app._apply_preset("Blazing")
+        self.app._apply_realism_profile("Robotic")
+        self.app._repeat_count_var.set("3")
+        self.app._repeat_sep_var.set("\\n")
+        self.assertEqual(self._run_to_completion("ab"), "ab\nab\nab")
+
+
+class ThreadSafetyTests(unittest.TestCase):
+    """The typing thread must not touch Tkinter directly.
+
+    Tkinter is not thread-safe. Reading a variable from the worker is
+    undefined behaviour even when it appears to work, and _run did exactly
+    that for the newline mode, while _record_session reached the editor
+    contents through _persist_state. Both are static mistakes, so a static
+    check catches them without needing a display.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import ast
+        cls.tree = ast.parse((ROOT / "human-type.py").read_text(encoding="utf-8"))
+        cls.cls_node = next(n for n in cls.tree.body
+                            if isinstance(n, ast.ClassDef))
+
+    def _method(self, name):
+        import ast
+        for node in self.cls_node.body:
+            if isinstance(node, ast.FunctionDef) and node.name == name:
+                return node
+        self.fail("no method named %s" % name)
+
+    def _calls_in(self, node):
+        import ast
+        names = []
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute):
+                names.append(sub.func.attr)
+        return names
+
+    def test_run_reads_no_tk_variables(self):
+        """Anything the worker needs must be passed in from the main thread."""
+        node = self._method("_run")
+        for banned in ("_newline_mode_value", "_current_style", "_persist_state"):
+            self.assertNotIn(
+                banned, self._calls_in(node),
+                "_run calls %s, which reads Tk state from the typing thread"
+                % banned)
+
+    def test_record_session_does_not_persist_inline(self):
+        """It runs on the typing thread; _persist_state reads the editor."""
+        import ast
+        node = self._method("_record_session")
+        for sub in ast.walk(node):
+            if (isinstance(sub, ast.Call)
+                    and isinstance(sub.func, ast.Attribute)
+                    and sub.func.attr == "_persist_state"):
+                parent_is_after = False
+                for outer in ast.walk(node):
+                    if (isinstance(outer, ast.Call)
+                            and isinstance(outer.func, ast.Attribute)
+                            and outer.func.attr == "after"
+                            and any(getattr(a, "attr", None) == "_persist_state"
+                                    for a in outer.args)):
+                        parent_is_after = True
+                self.assertTrue(
+                    parent_is_after,
+                    "_record_session calls _persist_state directly from the "
+                    "typing thread; schedule it with self.after instead")
+
+    def test_start_typing_hands_the_worker_plain_values(self):
+        """The thread should receive data, not widgets to interrogate."""
+        import ast
+        node = self._method("start_typing")
+        for sub in ast.walk(node):
+            if (isinstance(sub, ast.Call)
+                    and getattr(sub.func, "attr", None) == "Thread"):
+                kwargs = {k.arg: k.value for k in sub.keywords}
+                self.assertIn("args", kwargs)
+                return
+        self.fail("start_typing no longer starts a thread")
 
 
 class SourceStyleTests(unittest.TestCase):

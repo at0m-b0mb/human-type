@@ -157,12 +157,20 @@ def resolve_theme(name):
 # ---------------------------------------------------------------------------
 # Speed presets
 # ---------------------------------------------------------------------------
+# Speed presets set the pace and nothing else. Mistake rates belong to the
+# realism profiles, because two controls writing the same field means
+# whichever you touched last silently wins — pick Natural, then Blazing, and
+# the typo rate would drop to zero while the Realism segment still said
+# "Natural".
 PRESETS = {
-    "Slow":    {"base_delay": 0.15, "variation": 0.07,  "punct_pause": 0.40, "typo_chance": 0.02, "para_pause": 1.2},
-    "Normal":  {"base_delay": 0.08, "variation": 0.03,  "punct_pause": 0.25, "typo_chance": 0.04, "para_pause": 0.8},
-    "Fast":    {"base_delay": 0.04, "variation": 0.02,  "punct_pause": 0.12, "typo_chance": 0.02, "para_pause": 0.4},
-    "Blazing": {"base_delay": 0.01, "variation": 0.005, "punct_pause": 0.04, "typo_chance": 0.00, "para_pause": 0.1},
+    "Slow":    {"base_delay": 0.15, "variation": 0.07,  "punct_pause": 0.40, "para_pause": 1.2},
+    "Normal":  {"base_delay": 0.08, "variation": 0.03,  "punct_pause": 0.25, "para_pause": 0.8},
+    "Fast":    {"base_delay": 0.04, "variation": 0.02,  "punct_pause": 0.12, "para_pause": 0.4},
+    "Blazing": {"base_delay": 0.01, "variation": 0.005, "punct_pause": 0.04, "para_pause": 0.1},
 }
+
+# The timing fields a speed preset is responsible for.
+PRESET_FIELDS = ("base_delay", "variation", "punct_pause", "para_pause")
 
 # ---------------------------------------------------------------------------
 # Built-in snippets
@@ -1142,7 +1150,7 @@ class HumanTyperApp(ctk.CTk):
                 row=i * 2, column=1, sticky="e", pady=3)
             self._hint(b, hint, wrap=260, row=i * 2 + 1, column=0, columnspan=2,
                        sticky="w", pady=(0, T.SPACE["sm"]))
-            var.trace_add("write", lambda *_: self._update_count())
+            var.trace_add("write", lambda *_: self._on_timing_changed())
 
         ctk.CTkFrame(b, height=T.HAIRLINE, fg_color=T.BORDER).grid(
             row=90, column=0, columnspan=2, sticky="ew", pady=T.SPACE["sm"])
@@ -1500,6 +1508,10 @@ class HumanTyperApp(ctk.CTk):
         self._set_status("Ready.", "ok")
 
     # ----- Realism plumbing ------------------------------------------------
+    def _on_timing_changed(self):
+        self._sync_preset_segment()
+        self._update_count()
+
     def _update_newline_help(self):
         self._newline_help.set(
             NEWLINE_HELP.get(self._newline_mode_value(), ""))
@@ -1608,6 +1620,14 @@ class HumanTyperApp(ctk.CTk):
         self._notice_var.set(int(self.config.get("notice_max", self._notice_var.get())))
         self._notice_lbl.set(f"{int(self._notice_var.get())} chars")
 
+        # The profile above reset the typo rate to its own default, which
+        # would quietly discard a hand-tuned value. Drift and notice are
+        # restored after the profile for the same reason; this keeps the
+        # third one consistent with them.
+        saved_typo = self.config.get("last_settings", {}).get("typo_chance")
+        if saved_typo is not None:
+            self._vars["typo_chance"].set(saved_typo)
+
         # "newlines_enter" was a boolean before newline modes existed.
         mode = self.config.get("newline_mode")
         if mode not in NEWLINE_MODES:
@@ -1615,6 +1635,7 @@ class HumanTyperApp(ctk.CTk):
                 else "Skip (join)"
         self._newline_var.set(mode)
         self._update_newline_help()
+        self._sync_preset_segment()
         # Restore repeat
         rep = self.config.get("repeat", {})
         self._repeat_count_var.set(rep.get("count", "1"))
@@ -1714,13 +1735,36 @@ class HumanTyperApp(ctk.CTk):
     # Presets
     # =======================================================================
     def _apply_preset(self, name):
-        p = PRESETS[name]
-        self._vars["base_delay"].set(str(p["base_delay"]))
-        self._vars["variation"].set(str(p["variation"]))
-        self._vars["punct_pause"].set(str(p["punct_pause"]))
-        self._vars["typo_chance"].set(str(p["typo_chance"]))
-        self._vars["para_pause"].set(str(p["para_pause"]))
-        self._set_status(f"Preset applied: {name}", "ok")
+        for field, value in PRESETS[name].items():
+            self._vars[field].set(str(value))
+        self._set_status(f"Speed set to {name}.", "ok")
+
+    def _matching_preset(self):
+        """The preset the current timing fields correspond to, if any."""
+        try:
+            current = {f: float(self._vars[f].get()) for f in PRESET_FIELDS}
+        except (ValueError, KeyError):
+            return None
+        for name, preset in PRESETS.items():
+            if all(abs(current[f] - preset[f]) < 1e-9 for f in PRESET_FIELDS):
+                return name
+        return None
+
+    def _sync_preset_segment(self):
+        """Keep the Speed segment honest about the numbers underneath it.
+
+        Hand-editing a timing field, or reopening the app on saved settings,
+        used to leave the segment claiming a preset that no longer described
+        the values.
+        """
+        seg = getattr(self, "_preset_seg", None)
+        if seg is None:
+            return
+        name = self._matching_preset()
+        try:
+            seg.set(name if name else "")
+        except Exception:
+            pass
 
     def _custom_preset_values(self):
         items = list(self.config.get("custom_presets", {}).keys())
@@ -2149,7 +2193,7 @@ class HumanTyperApp(ctk.CTk):
             return
         self.config.get("custom_snippets", {}).pop(name, None)
         self._snip_selected = None
-        self._snip_title_var.set("No snippet selected")
+        self._snip_title_var.set("Nothing selected")
         self._snip_preview.delete("1.0", tk.END)
         self._persist_state()
         self._refresh_snippet_list()
@@ -2319,9 +2363,14 @@ class HumanTyperApp(ctk.CTk):
         if self._overlay_var.get():
             self._build_overlay()
 
+        # Everything the worker needs is read here, on the main thread.
+        # Tkinter is not thread-safe, and a variable read from the typing
+        # thread is undefined behaviour even when it appears to work.
+        newline_mode = self._newline_mode_value()
+
         threading.Thread(
             target=self._run,
-            args=(text, style, start_delay, planned, rng),
+            args=(text, style, start_delay, planned, rng, newline_mode),
             daemon=True,
         ).start()
 
@@ -2332,7 +2381,7 @@ class HumanTyperApp(ctk.CTk):
     # executes the resulting event stream and reports progress. Keeping the
     # two apart is what lets the engine be tested without a keyboard.
     # =======================================================================
-    def _run(self, text, style, start_delay, planned, rng):
+    def _run(self, text, style, start_delay, planned, rng, newline_mode):
         try:
             # Countdown
             for remaining in range(int(start_delay), 0, -1):
@@ -2356,7 +2405,7 @@ class HumanTyperApp(ctk.CTk):
                 sum(ev.seconds for ev in planned if isinstance(ev, rz.Pause))
                 if planned is not None else None)
 
-            mode = self._newline_mode_value()
+            mode = newline_mode
             self._paused_total = 0.0
             self._pause_started = None
             typed = 0          # source characters correctly in place
@@ -2461,7 +2510,10 @@ class HumanTyperApp(ctk.CTk):
         })
         self.config["session_history"] = hist[:20]
 
-        self._persist_state()
+        # _record_session runs on the typing thread, and _persist_state
+        # reads Tk variables and the editor contents, so it has to be handed
+        # back to the main thread rather than called here.
+        self.after(0, self._persist_state)
         self.after(0, self._refresh_stat_cards)
         self.after(0, self._refresh_history)
 

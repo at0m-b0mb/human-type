@@ -77,6 +77,23 @@ a testable planner.
 
 ### Fixed
 
+- **The typing thread read Tkinter state.** `_run` fetched the newline mode
+  from a Tk variable on the worker thread, and `_record_session` reached the
+  editor contents through `_persist_state` from the same thread. Tkinter is
+  not thread-safe; both are undefined behaviour even when they appear to
+  work. The mode is now read on the main thread and passed in, and the config
+  write is scheduled back with `after`.
+- **Speed presets silently overwrote the realism profile's typo rate.**
+  Choosing Natural and then Blazing dropped the mistake rate to zero while
+  the Realism segment still said Natural. Speed now sets pace only; mistake
+  rates belong to the profiles, which is what the interface already claimed.
+- **The Speed segment lied after a restart**, showing Normal whatever the
+  saved timing values were. It now reflects the actual numbers, and clears
+  itself when a field is hand-edited away from every preset.
+- **A hand-tuned typo rate was lost on restart**, because the profile reset it
+  and nothing restored it afterwards — unlike rhythm drift and notice delay,
+  which were already handled.
+
 - **Find & Replace was unusable.** Its buttons sat below the bottom edge of a
   fixed-height window, so Replace all looked absent, and the dialog had never
   been restyled — it still used the toolkit's default palette, which against
@@ -92,7 +109,7 @@ a testable planner.
 
 ### Tests
 
-- 95 tests across four suites. The engine, document and palette suites need
+- 108 tests across four suites. The engine, document and palette suites need
   no display and no dependencies; CI runs them on macOS, Windows and Linux
   against Python 3.9 and 3.13.
 - The palette suite checks every text pairing against WCAG AA in both themes

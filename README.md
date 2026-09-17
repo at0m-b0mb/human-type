@@ -8,7 +8,7 @@ Drifting rhythm, per-key effort, and mistakes noticed a beat late instead of ins
 Every one of them corrected before the run ends.
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-95%20passing-2C6A4F)](#tests)
+[![Tests](https://img.shields.io/badge/tests-108%20passing-2C6A4F)](#tests)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6B6B76)](#requirements)
 [![License](https://img.shields.io/badge/license-MIT-9C7B3A)](LICENSE)
 
@@ -198,12 +198,16 @@ How a newline is delivered matters more than it sounds, because in a chat box
 
 ### Speed presets
 
-| Preset | Base delay | Variation | Punctuation | Typo chance |
+| Preset | Base delay | Variation | Punctuation | Paragraph |
 |---|---|---|---|---|
-| Slow | 0.15 s | ± 0.07 s | 0.40 s | 2% |
-| Normal | 0.08 s | ± 0.03 s | 0.25 s | 4% |
-| Fast | 0.04 s | ± 0.02 s | 0.12 s | 2% |
-| Blazing | 0.01 s | ± 0.005 s | 0.04 s | 0% |
+| Slow | 0.15 s | ± 0.07 s | 0.40 s | 1.20 s |
+| Normal | 0.08 s | ± 0.03 s | 0.25 s | 0.80 s |
+| Fast | 0.04 s | ± 0.02 s | 0.12 s | 0.40 s |
+| Blazing | 0.01 s | ± 0.005 s | 0.04 s | 0.10 s |
+
+Speed presets set the pace and nothing else. Mistake rates belong to the
+realism profiles — two controls writing one field means whichever you touched
+last silently wins, and the other control's label stops being true.
 
 ### What the numbers mean
 
@@ -226,7 +230,7 @@ make test-engine   # no display and no dependencies required
 | `tests/test_realism.py` | 30 | 62,119 individual checks — reconstruction, backspace safety, the effort model, rhythm autocorrelation, determinism |
 | `tests/test_docimport.py` | 26 | Real `.docx`/`.odt` archives built in memory, RTF, HTML, encodings, zip bombs |
 | `tests/test_theme.py` | 11 | Every text pairing against WCAG AA, in both themes and all six accents |
-| `tests/test_ui.py` | 28 | Every page and dialog builds, nothing falls back to the toolkit's default palette, nothing is clipped out of its own window, settings round-trip |
+| `tests/test_ui.py` | 41 | Every page and dialog builds, nothing falls back to the toolkit's default palette, nothing is clipped out of its own window, settings round-trip, end-to-end typing runs reproduce their input, and the typing thread never touches Tkinter |
 
 `realism.py` and `docimport.py` import nothing outside the standard library,
 so the engine suites run anywhere Python does — no GUI, no keyboard, no
