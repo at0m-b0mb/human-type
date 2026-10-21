@@ -7,10 +7,13 @@
 Drifting rhythm, per-key effort, and mistakes noticed a beat late instead of instantly.
 Every one of them corrected before the run ends.
 
+[![Version](https://img.shields.io/badge/version-1.1.0-9C7B3A)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-129%20passing-2C6A4F)](#tests)
+[![Tests](https://img.shields.io/badge/tests-153%20passing-2C6A4F)](#tests)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6B6B76)](#requirements)
 [![License](https://img.shields.io/badge/license-MIT-9C7B3A)](LICENSE)
+
+[What makes it look human](#what-makes-it-look-human)&nbsp; · &nbsp;[Honest estimates](#honest-estimates)&nbsp; · &nbsp;[Look-alike characters](#look-alike-characters)&nbsp; · &nbsp;[Quick start](#quick-start)&nbsp; · &nbsp;[Settings](#settings-reference)&nbsp; · &nbsp;[Tests](#tests)
 
 </div>
 
@@ -102,6 +105,35 @@ plan rather than extrapolating from how the first line went, so it does not
 lurch when the run hits a thinking pause. Time spent paused is excluded from
 the speed figure.
 
+### Do the speed settings actually do anything?
+
+They change the plan enormously. Measured over 30 seeds on the same
+792-character passage, planned net WPM:
+
+| | Robotic | Steady | Natural | Hurried | Thoughtful |
+|---|---:|---:|---:|---:|---:|
+| **Slow** | 72 | 61 | 42 | 43 | 43 |
+| **Normal** | 132 | 112 | 74 | 76 | 74 |
+| **Fast** | 265 | 225 | 132 | 141 | 131 |
+| **Blazing** | 1,033 | 872 | 318 | 383 | 303 |
+
+What the plan cannot control is everything after it. Executing the stream
+costs about **1 ms per keystroke** here on top of the plan, and the keystrokes
+then go through the OS into an application that is under no obligation to
+drain them as fast as they arrive. At Slow that overhead is noise; at Blazing
+it is a fifth of the gap between keys, and a receiving app that cannot keep up
+will flatten Fast and Blazing into the same thing no matter what you set.
+
+Which is why a finished run now tells you both numbers:
+
+```
+Done typing ✓   30s planned · 34s actual (+13%)
+```
+
+If those two are close, the setting is doing exactly what it says. If the
+actual is far above the plan, the ceiling is the window you are typing into,
+not the dial — and the honest fix is a slower preset rather than a faster one.
+
 ## Documents you can open
 
 Open pulls the **text** out of a document so it can be typed somewhere else.
@@ -133,6 +165,51 @@ One thing worth knowing: `{variables}` expand when typing starts, so a file
 the target window. Opening a file that contains variable tokens now says so
 before you start.
 
+## Look-alike characters
+
+Open the figure below at full size and count the ones you could tell apart.
+
+<div align="center">
+
+![Eight dash characters measured at the editor's own size. Six of them are the identical eight-by-one pixel stroke.](docs/dashes.svg)
+
+</div>
+
+That is not a trick of the eye and it is not a rendering bug. Measured in
+Menlo at the editor's own 13px, **six of the eight dash characters are the
+same 8&nbsp;×&nbsp;1 pixel stroke** — hyphen-minus, figure dash, en dash, em
+dash, horizontal bar and minus sign. Only `U+2010` and `U+2011` come out
+shorter. Changing the font does not help: Monaco, Courier New and Andale Mono
+collapse them in exactly the same way, because giving every character the
+same cell is what a monospace font is *for*.
+
+It matters more here than in an ordinary editor. These are the characters a
+document carries in from Word, Pages or a web page — and they are the ones a
+target window is most likely to have no key for. A kiosk form, a remote
+console or an exam browser on a US layout has no em dash.
+
+So the editor stopped relying on the glyph. Three things, none of which
+touches a byte of your text:
+
+| | |
+|---|---|
+| **Marks** | A toolbar toggle that tints the four families that look like something they are not: dashes, curly quotes, exotic spaces, and zero-width and bidi controls. An invisible character has no width to tint, so it borrows the character beside it rather than marking nothing. |
+| **The caret readout** | Under the editor, the exact character next to the cursor, named: `EM DASH (U+2014)`. The one to the left wins; the one to the right is named with an arrow, because which side of a dash you click on is a coin toss. This is the part that tells an en dash from an em dash. |
+| **The inspector** | Lists every look-alike in the text, by name, with counts — so you know they are there before you go looking. |
+
+If flattening is what you actually wanted, **Transform → Dashes → ASCII** and
+**Punctuation → ASCII** do that. Those two change the text, deliberately and
+visibly, which is the difference between a tool that reveals and a tool that
+meddles.
+
+Every wash is declared as a light/dark pair and held to WCAG AA against both
+the editor background and its own ink, in both themes — same rule as the rest
+of the palette. Re-measure the collision yourself:
+
+```bash
+python3 tools/make_dash_figure.py
+```
+
 ## Quick start
 
 ```bash
@@ -154,7 +231,7 @@ top-left corner of the screen aborts immediately, at any moment.
 
 | Page | What lives there |
 |---|---|
-| **Compose** | The editor, document import, find & replace, text transforms, `{variables}`, and a live analysis panel |
+| **Compose** | The editor, document import, find & replace, text transforms, `{variables}`, look-alike marks, and a live analysis panel |
 | **Behaviour** | Speed presets, realism profile, the individual realism switches, timing fields, and how newlines are delivered |
 | **Library** | Snippets — built-in and your own |
 | **Insights** | Lifetime and session totals, accuracy, and a log of recent runs |
@@ -240,8 +317,8 @@ make test-engine   # no display and no dependencies required
 |---|---:|---|
 | `tests/test_realism.py` | 30 | 62,119 individual checks — reconstruction, backspace safety, the effort model, rhythm autocorrelation, determinism |
 | `tests/test_docimport.py` | 36 | Real `.docx`/`.odt` archives built in memory, RTF, HTML, encodings, zip bombs, entity expansion, XXE, stack exhaustion |
-| `tests/test_theme.py` | 11 | Every text pairing against WCAG AA, in both themes and all six accents |
-| `tests/test_ui.py` | 52 | Every page and dialog builds, nothing falls back to the toolkit's default palette, nothing is clipped out of its own window, settings round-trip, end-to-end typing runs reproduce their input, the typing thread never touches Tkinter, and a corrupted config never locks you out |
+| `tests/test_theme.py` | 15 | Every text pairing against WCAG AA, in both themes and all six accents, including the four look-alike washes against the editor and against their own ink |
+| `tests/test_ui.py` | 72 | Every page and dialog builds, nothing falls back to the toolkit's default palette, nothing is clipped out of its own window, dialogs stay hidden until they are finished and appear at their final size, Escape does not leak past a dialog, popup menus post instead of recursing, marks tint the right characters and change none of them, settings round-trip, end-to-end typing runs reproduce their input, the typing thread never touches Tkinter, and a corrupted config never locks you out |
 
 `realism.py` and `docimport.py` import nothing outside the standard library,
 so the engine suites run anywhere Python does — no GUI, no keyboard, no
@@ -273,7 +350,7 @@ realism.py         Typing realism engine — pure, no GUI, no keyboard
 docimport.py       Document text extraction — standard library only
 theme.py           Design system: colours, type, spacing, widget recipes
 tests/             Engine, document, palette and interface suites
-tools/             Chart, site and screenshot generators
+tools/             Chart, figure, site and screenshot generators
 docs/              The project site (generated — edit _template.html)
 ```
 

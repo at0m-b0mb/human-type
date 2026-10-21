@@ -897,6 +897,250 @@ class InputSafetyTests(unittest.TestCase):
         self.assertLessEqual(len(self.app.config.get("recent_files", [])), 20)
 
 
+@unittest.skipUnless(HAVE_DISPLAY, "no display available")
+class LookalikeTests(unittest.TestCase):
+    """An em dash and a hyphen are the same pixels in a monospace editor.
+
+    Nothing here checks how they *look*, because how they look is the bug.
+    These check the two things that can be checked: that the editor marks
+    them, and that it never changes them.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_app_module()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.m.CONFIG_PATH = Path(cls.tmp.name) / "config.json"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.app = self.m.HumanTyperApp()
+        self.app.update_idletasks()
+
+    def tearDown(self):
+        self.app.destroy()
+
+    SAMPLE = "a-b\u2013c\u2014d\u00a0e\u200bf\u201cg\u201d"
+
+    def _load(self, text):
+        self.app._tb.delete("1.0", "end")
+        self.app._tb.insert("1.0", text)
+        self.app._update_count()
+        self.app.update_idletasks()
+
+    def test_the_table_names_every_dash_that_looks_like_a_hyphen(self):
+        for ch in ("\u2010", "\u2011", "\u2012", "\u2013", "\u2014",
+                   "\u2015", "\u2212"):
+            self.assertEqual(self.m.LOOKALIKES[ch][0], "dash", repr(ch))
+            # Every one of them flattens to a plain ASCII hyphen.
+            self.assertEqual(set(self.m.LOOKALIKES[ch][2]), {"-"}, repr(ch))
+        self.assertEqual(self.m.LOOKALIKES["-"][0], "dash")
+
+    def test_every_lookalike_names_itself_with_its_codepoint(self):
+        for ch in self.m.LOOKALIKES:
+            name = self.m.lookalike_name(ch)
+            self.assertIn("U+%04X" % ord(ch), name)
+        self.assertIsNone(self.m.lookalike_name("x"))
+
+    def test_counts_are_named_and_ordered(self):
+        found = self.m.count_lookalikes(self.SAMPLE)
+        self.assertEqual(found["\u2013"], 1)
+        self.assertEqual(found["\u2014"], 1)
+        self.assertNotIn("-", found, "a plain hyphen is not a look-alike")
+        self.assertEqual(self.m.count_lookalikes(""), {})
+
+    def test_marks_tag_the_right_characters(self):
+        self._load(self.SAMPLE)
+        self.app._marks_on = False
+        self.app._toggle_marks()
+        self.app.update_idletasks()
+        box = self.app._tb._textbox
+        dashes = box.tag_ranges("mark_dash")
+        self.assertTrue(dashes, "the en and em dash were not tinted")
+        marked = {box.get(str(dashes[i]), str(dashes[i + 1]))
+                  for i in range(0, len(dashes), 2)}
+        self.assertEqual(marked, {"\u2013", "\u2014"})
+        self.assertTrue(box.tag_ranges("mark_quote"))
+        self.assertTrue(box.tag_ranges("mark_space"))
+        # A plain hyphen is what everything else is mistaken for, so it is
+        # never tinted — otherwise the whole document lights up.
+        for name in ("mark_dash", "mark_quote", "mark_space", "mark_hidden"):
+            for i in range(0, len(box.tag_ranges(name)), 2):
+                r = box.tag_ranges(name)
+                self.assertNotEqual(box.get(str(r[i]), str(r[i + 1])), "-")
+
+    def test_marks_never_change_the_text(self):
+        """The whole guarantee of this tool is that the text is untouched."""
+        self._load(self.SAMPLE)
+        before = self.app._tb.get("1.0", "end")
+        self.app._toggle_marks()
+        self.app.update_idletasks()
+        self.app._toggle_marks()
+        self.app.update_idletasks()
+        self.assertEqual(self.app._tb.get("1.0", "end"), before)
+
+    def test_marks_off_leaves_no_tags_behind(self):
+        self._load(self.SAMPLE)
+        self.app._marks_on = False
+        self.app._toggle_marks()           # on
+        self.app._toggle_marks()           # off
+        self.app.update_idletasks()
+        box = self.app._tb._textbox
+        for cls in ("dash", "quote", "space", "hidden"):
+            self.assertEqual(box.tag_ranges("mark_" + cls), ())
+
+    def test_a_zero_width_character_still_gets_tinted(self):
+        """It has no width of its own, so it borrows its neighbour's."""
+        self._load("ab\u200bcd")
+        self.app._marks_on = False
+        self.app._toggle_marks()
+        self.app.update_idletasks()
+        box = self.app._tb._textbox
+        r = box.tag_ranges("mark_hidden")
+        self.assertTrue(r, "an invisible character was marked invisibly")
+        self.assertGreater(len(box.get(str(r[0]), str(r[1]))), 1,
+                           "the mark has no width, so it draws nothing")
+
+    def test_the_caret_readout_names_the_character_behind_it(self):
+        self._load("a\u2014b")
+        box = self.app._tb._textbox
+        box.mark_set("insert", "1.2")      # just past the em dash
+        self.app._update_caret_readout()
+        self.assertIn("EM DASH", self.app._char_var.get())
+        self.assertFalse(self.app._char_var.get().startswith("\u2192"),
+                         "a character behind the caret should not be arrowed")
+        box.mark_set("insert", "1.1")      # sitting just before the em dash
+        self.app._update_caret_readout()
+        self.assertEqual(self.app._char_var.get(), "\u2192 EM DASH (U+2014)",
+                         "the character ahead of the caret must be arrowed")
+        box.mark_set("insert", "1.3")      # past the "b", nothing of note
+        self.app._update_caret_readout()
+        self.assertEqual(self.app._char_var.get(), "")
+        self.assertIn("Ln 1", self.app._caret_var.get())
+
+    def test_the_inspector_lists_what_is_there(self):
+        self._load(self.SAMPLE)
+        labels = [w.cget("text") for w in self._walk_labels(self.app._marks_list)]
+        joined = " ".join(labels).upper()
+        self.assertIn("EM DASH", joined)
+        self.assertIn("EN DASH", joined)
+        self.assertIn("NO-BREAK SPACE", joined)
+        self._load("plain ascii only - really")
+        self.assertTrue(self.app._marks_empty.winfo_ismapped())
+
+    def _walk_labels(self, widget):
+        import customtkinter as ctk
+        out = []
+        for child in widget.winfo_children():
+            if isinstance(child, ctk.CTkLabel):
+                out.append(child)
+            out.extend(self._walk_labels(child))
+        return out
+
+    def test_the_ascii_transforms_flatten_what_they_claim_to(self):
+        self.assertEqual(self.m.to_ascii_dashes("a\u2013b\u2014c"), "a-b--c")
+        self.assertEqual(
+            self.m.to_ascii_punctuation("\u201cq\u201d\u2014x\u00a0y\u200bz\u2026"),
+            '"q"--x yz...')
+        # The dash transform is about dashes; it leaves quotes alone.
+        self.assertEqual(self.m.to_ascii_dashes("\u201cq\u201d"), "\u201cq\u201d")
+
+    def test_both_ascii_transforms_are_offered_in_the_menu(self):
+        names = [n for n, _fn in self.m.TRANSFORMS]
+        self.assertIn("Dashes \u2192 ASCII", names)
+        self.assertIn("Punctuation \u2192 ASCII", names)
+
+
+@unittest.skipUnless(HAVE_DISPLAY, "no display available")
+class DialogBehaviourTests(unittest.TestCase):
+    """Find & Replace used to appear twice.
+
+    A CTkToplevel is mapped as soon as it exists, so the window showed up at
+    the toolkit's placeholder size, then jumped to its real size and place —
+    which reads as one window closing and another opening. The invariant that
+    prevents it is that nothing is mapped until it is finished.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_app_module()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.m.CONFIG_PATH = Path(cls.tmp.name) / "config.json"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.app = self.m.HumanTyperApp()
+        self.app.update_idletasks()
+
+    def tearDown(self):
+        self.app.destroy()
+
+    def test_a_new_dialog_is_hidden_until_it_is_shown(self):
+        win = self.app._dialog("Test")
+        self.app.update_idletasks()
+        self.assertEqual(win.state(), "withdrawn",
+                         "the window was mapped before it had any content")
+        self.app._show_dialog(win)
+        self.assertEqual(win.state(), "normal")
+        win.destroy()
+
+    def test_find_and_replace_is_visible_and_already_the_right_size(self):
+        self.app.open_find_replace()
+        self.app.update_idletasks()
+        win = self.app._find_win
+        self.assertEqual(win.state(), "normal")
+        # If these differ, the window was shown at one size and resized
+        # afterwards — the jump the user saw as a second window.
+        self.assertAlmostEqual(win.winfo_width(), max(480, win.winfo_reqwidth()),
+                               delta=2)
+        self.assertAlmostEqual(win.winfo_height(), win.winfo_reqheight(), delta=2)
+        self.assertGreater(win.winfo_height(), 200,
+                           "the dialog is still at the toolkit placeholder size")
+        win.destroy()
+
+    def test_find_and_replace_reuses_its_window(self):
+        self.app.open_find_replace()
+        first = self.app._find_win
+        self.app.open_find_replace()
+        self.assertIs(self.app._find_win, first,
+                      "clicking Find twice opened a second window")
+        first.destroy()
+
+    def test_escape_closes_the_dialog_without_stopping_a_run(self):
+        self.app.open_find_replace()
+        self.app.update_idletasks()
+        win = self.app._find_win
+        stopped = []
+        self.app.stop_typing = lambda *a: stopped.append(True)
+        win.event_generate("<Escape>")
+        self.app.update_idletasks()
+        self.assertFalse(win.winfo_exists(), "Escape did not close the dialog")
+        self.assertFalse(stopped,
+                         "Escape leaked past the dialog and stopped the run")
+
+    def test_popup_menus_post_instead_of_recursing(self):
+        """_popup used to call itself, so these buttons silently did nothing."""
+        import tkinter as tk
+        posted = []
+        original = tk.Menu.tk_popup
+        tk.Menu.tk_popup = lambda self, x, y, entry="": posted.append((x, y))
+        try:
+            self.app._tb.delete("1.0", "end")
+            self.app._tb.insert("1.0", "something to transform")
+            self.app._open_transform_menu()
+            self.app._open_variables_menu()
+        finally:
+            tk.Menu.tk_popup = original
+        self.assertEqual(len(posted), 2,
+                         "a popup menu was never posted")
+
+
 class SourceStyleTests(unittest.TestCase):
     """Static checks — these need no display, so CI runs them everywhere."""
 
@@ -920,6 +1164,42 @@ class SourceStyleTests(unittest.TestCase):
             self.assertNotIn(
                 bad, self.source,
                 "use the INK/INK_2/INK_3 tokens instead of a literal grey")
+
+    def test_the_popup_helper_does_not_call_itself(self):
+        """It did, which is why Recent, Transform and Variable did nothing."""
+        body = self.source.split("def _popup(self, menu):")[1].split("def ")[0]
+        self.assertNotIn("self._popup(", body,
+                         "_popup calls itself and will recurse forever")
+        self.assertIn("tk_popup(", body)
+
+    def test_every_dialog_is_shown_before_it_is_handed_back(self):
+        """A dialog built by _dialog starts hidden, so something must show it.
+
+        Miss the call and the window never appears at all — which is a louder
+        failure than the flash it replaced, but still worth a test.
+        """
+        built = self.source.count("self._dialog(")
+        shown = (self.source.count("self._show_dialog(")
+                 + self.source.count("self._fit_dialog("))
+        self.assertGreaterEqual(
+            shown, built,
+            "%d dialogs are built but only %d are ever shown" % (built, shown))
+
+    def test_dialog_geometry_goes_round_customtkinter(self):
+        """CTk's geometry()/minsize()/resizable() would scale twice on
+        Windows and, worse, restore a hidden window to hidden."""
+        body = self.source.split("def _fit_dialog(")[1].split("\n    def ")[0]
+        for wrapped in ("win.geometry(", "win.minsize(", "win.resizable("):
+            self.assertNotIn(
+                wrapped, body,
+                "use the wm_ form instead of %s" % wrapped)
+
+    def test_progress_reporting_is_throttled(self):
+        """One UI update per keystroke saturates the event loop at Blazing."""
+        self.assertIn("TICK_INTERVAL", self.source)
+        body = self.source.split("def _tick(")[1].split("\n    def ")[0]
+        self.assertIn("TICK_INTERVAL", body,
+                      "_tick posts on every keystroke")
 
     def test_no_leftover_default_toplevels(self):
         """Every secondary window should be built by self._dialog()."""

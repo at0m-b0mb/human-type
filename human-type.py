@@ -58,6 +58,7 @@ DEFAULT_CONFIG = {
     "custom_presets": {},
     "custom_snippets": {},
     "draft": "",
+    "show_marks": False,
     "realism_profile": "Natural",
     "newline_mode": "Press Enter",
     "rhythm_drift": 0.11,
@@ -308,6 +309,94 @@ def expand_variables(text):
 
 
 # ---------------------------------------------------------------------------
+# Look-alike characters
+# ---------------------------------------------------------------------------
+# The editor is monospace, which means every dash is drawn into the same
+# cell: at 13px a hyphen, an en dash and an em dash are the *same pixels*.
+# Switching monospace does not help — Menlo, Monaco, Courier New and Andale
+# Mono all collapse them. The honest fix is to stop relying on the glyph:
+# tint each family in the editor, name every character in the inspector, and
+# offer a transform that flattens them to ASCII if that is what you wanted.
+#
+# This matters more here than in a normal editor. These characters are the
+# ones a document carries in from Word, Pages or a web page, and the ones a
+# target window is most likely to refuse — a kiosk form or a remote console
+# on a US layout has no key for an em dash at all.
+#
+# char -> (class, name, ascii replacement)
+LOOKALIKES = {
+    "\u002d": ("dash",   "HYPHEN-MINUS",              "-"),
+    "\u2010": ("dash",   "HYPHEN",                     "-"),
+    "\u2011": ("dash",   "NON-BREAKING HYPHEN",        "-"),
+    "\u2012": ("dash",   "FIGURE DASH",                "-"),
+    "\u2013": ("dash",   "EN DASH",                    "-"),
+    "\u2014": ("dash",   "EM DASH",                    "--"),
+    "\u2015": ("dash",   "HORIZONTAL BAR",             "--"),
+    "\u2212": ("dash",   "MINUS SIGN",                 "-"),
+    "\u2018": ("quote",  "LEFT SINGLE QUOTATION MARK",  "'"),
+    "\u2019": ("quote",  "RIGHT SINGLE QUOTATION MARK", "'"),
+    "\u201a": ("quote",  "SINGLE LOW-9 QUOTATION MARK", "'"),
+    "\u201c": ("quote",  "LEFT DOUBLE QUOTATION MARK",  '"'),
+    "\u201d": ("quote",  "RIGHT DOUBLE QUOTATION MARK", '"'),
+    "\u201e": ("quote",  "DOUBLE LOW-9 QUOTATION MARK", '"'),
+    "\u2032": ("quote",  "PRIME",                       "'"),
+    "\u2033": ("quote",  "DOUBLE PRIME",                '"'),
+    "\u00a0": ("space",  "NO-BREAK SPACE",              " "),
+    "\u2007": ("space",  "FIGURE SPACE",                " "),
+    "\u2009": ("space",  "THIN SPACE",                  " "),
+    "\u202f": ("space",  "NARROW NO-BREAK SPACE",       " "),
+    "\u3000": ("space",  "IDEOGRAPHIC SPACE",           " "),
+    "\u200b": ("hidden", "ZERO WIDTH SPACE",            ""),
+    "\u200c": ("hidden", "ZERO WIDTH NON-JOINER",       ""),
+    "\u200d": ("hidden", "ZERO WIDTH JOINER",           ""),
+    "\u200e": ("hidden", "LEFT-TO-RIGHT MARK",          ""),
+    "\u200f": ("hidden", "RIGHT-TO-LEFT MARK",          ""),
+    "\u2060": ("hidden", "WORD JOINER",                 ""),
+    "\ufeff": ("hidden", "ZERO WIDTH NO-BREAK SPACE",   ""),
+    "\u00ad": ("hidden", "SOFT HYPHEN",                 ""),
+    "\u2026": ("quote",  "HORIZONTAL ELLIPSIS",         "..."),
+}
+
+# A plain hyphen is the thing everything else is mistaken *for*, so it is
+# listed above to be nameable but never tinted and never counted as a find.
+MARKED = {c: cls for c, (cls, _n, _a) in LOOKALIKES.items() if c != "-"}
+
+MARK_RE = re.compile("[%s]" % "".join(re.escape(c) for c in sorted(MARKED)))
+
+
+def lookalike_name(ch):
+    """"EM DASH (U+2014)" for a character, or None if it is unremarkable."""
+    entry = LOOKALIKES.get(ch)
+    if entry is None:
+        return None
+    return "%s (U+%04X)" % (entry[1], ord(ch))
+
+
+def count_lookalikes(text):
+    """char -> occurrences, for every marked character present. Ordered."""
+    found = {}
+    for ch in text:
+        if ch in MARKED:
+            found[ch] = found.get(ch, 0) + 1
+    return {c: found[c] for c in LOOKALIKES if c in found}
+
+
+def to_ascii_dashes(s):
+    """Every dash, hyphen and minus look-alike down to ASCII hyphens."""
+    for ch, (cls, _name, repl) in LOOKALIKES.items():
+        if cls == "dash":
+            s = s.replace(ch, repl)
+    return s
+
+
+def to_ascii_punctuation(s):
+    """Dashes, curly quotes, exotic spaces and invisibles down to ASCII."""
+    for ch, (_cls, _name, repl) in LOOKALIKES.items():
+        s = s.replace(ch, repl)
+    return s
+
+
+# ---------------------------------------------------------------------------
 # Text transforms — pure string operations
 # ---------------------------------------------------------------------------
 def _smart_quotes(s):
@@ -355,6 +444,8 @@ TRANSFORMS = [
     ("Reverse lines",    lambda s: "\n".join(reversed(s.splitlines()))),
     ("Dedupe lines",     lambda s: "\n".join(dict.fromkeys(s.splitlines()))),
     ("Smart quotes",     _smart_quotes),
+    ("Dashes → ASCII",   to_ascii_dashes),
+    ("Punctuation → ASCII", to_ascii_punctuation),
     ("Strip markdown",   _strip_markdown),
 ]
 
@@ -736,36 +827,69 @@ class HumanTyperApp(ctk.CTk):
     # which against warm paper reads as a disabled control rather than a
     # styled one. Everything below goes through these.
     def _dialog(self, title, size=None):
+        """An empty, themed, *hidden* dialog. Call _show_dialog when it is built.
+
+        A CTkToplevel is mapped the instant it exists. Filling it afterwards
+        and only then setting its size and position meant the window appeared
+        at the toolkit's placeholder size in the corner, vanished, and came
+        back somewhere else at a different size — which is why Find & Replace
+        looked like one window closing and a second one opening. Nothing is
+        shown until the content, the size and the place are all settled.
+        """
         win = ctk.CTkToplevel(self)
+        win.withdraw()
         win.title(title)
         if size:
-            win.geometry(size)
+            win.wm_geometry(size)
         win.configure(fg_color=T.CANVAS)
         win.transient(self)
         return win
 
+    def _centre_over_self(self, width, height):
+        """A geometry string that puts a width x height window over the app."""
+        try:
+            x = self.winfo_rootx() + (self.winfo_width() - width) // 2
+            y = self.winfo_rooty() + (self.winfo_height() - height) // 3
+        except tk.TclError:
+            return "%dx%d" % (width, height)
+        return "%dx%d+%d+%d" % (width, height, max(0, x), max(0, y))
+
+    def _show_dialog(self, win):
+        """Map a dialog built by _dialog, once, and give it the keyboard."""
+        win.deiconify()
+        win.update_idletasks()
+        win.lift()
+        win.focus_force()
+        return win
+
     def _fit_dialog(self, win, min_width=420, resizable=False):
-        """Grow the window to whatever its content actually needs.
+        """Size the window to whatever its content actually needs, then show it.
 
         Hard-coding a height is how the Find & Replace buttons ended up off
         the bottom edge: the number was measured against one machine's font
         metrics, and every other platform renders taller. Asking Tk for the
         requested size cannot be wrong.
+
+        The wm_* calls are deliberate rather than the CustomTkinter wrappers.
+        Two reasons. CTk's geometry() and minsize() multiply by the window
+        scaling factor, but winfo_reqwidth() is already in real pixels, so
+        going through them scaled the dialog a second time — half again too
+        big at 150% display scaling. And CTk's resizable() schedules a
+        titlebar repaint on Windows that snapshots the window state, which
+        while the window is still hidden is "withdrawn" — it would restore it
+        to hidden 5ms later and the dialog would never appear at all.
         """
         win.update_idletasks()
         width = max(min_width, win.winfo_reqwidth())
         height = win.winfo_reqheight()
-        win.geometry("%dx%d" % (width, height))
-        win.minsize(width, height)
-        win.resizable(resizable, resizable)
-        # Centre on the main window rather than the screen corner.
-        try:
-            x = self.winfo_rootx() + (self.winfo_width() - width) // 2
-            y = self.winfo_rooty() + (self.winfo_height() - height) // 3
-            win.geometry("+%d+%d" % (max(0, x), max(0, y)))
-        except Exception:
-            pass
-        return win
+        win.wm_resizable(resizable, resizable)
+        win.wm_minsize(width, height)
+        # Size and position in one call, while still hidden: nothing to see
+        # jumping. CTk tracks its own idea of the size for DPI changes, so
+        # keep it honest even though we went around its setter.
+        win.wm_geometry(self._centre_over_self(width, height))
+        win._current_width, win._current_height = width, height
+        return self._show_dialog(win)
 
     def _dialog_heading(self, parent, title, subtitle=None):
         head = ctk.CTkFrame(parent, fg_color="transparent")
@@ -787,7 +911,16 @@ class HumanTyperApp(ctk.CTk):
         return tk.Menu(self, **T.menu_kwargs())
 
     def _popup(self, menu):
-        self._popup(menu)
+        """Drop a themed menu at the pointer.
+
+        This used to call itself, so Recent, Transform and Variable each
+        raised RecursionError into Tk's callback handler — which prints to
+        stderr and swallows it, so the buttons simply did nothing.
+        """
+        try:
+            menu.tk_popup(self.winfo_pointerx(), self.winfo_pointery())
+        finally:
+            menu.grab_release()
 
     def _show_page(self, key):
         for name, page in self._pages.items():
@@ -946,6 +1079,12 @@ class HumanTyperApp(ctk.CTk):
         ]:
             ctk.CTkButton(bar, text=label, width=width, command=cmd,
                           **T.ghost_button_kwargs()).pack(side="left", padx=(0, 2))
+        # Marks is a toggle, not an action, so it carries its own state.
+        self._marks_btn = ctk.CTkButton(bar, text="Marks", width=70,
+                                        command=self._toggle_marks,
+                                        **T.ghost_button_kwargs())
+        self._marks_btn.pack(side="left", padx=(0, 2))
+        self._accent_widget(self._marks_btn, self._marks_button_recipe)
         ctk.CTkButton(bar, text="Clear", width=64, command=self.clear_text,
                       **T.quiet_button_kwargs()).pack(side="left", padx=(2, 0))
 
@@ -959,9 +1098,29 @@ class HumanTyperApp(ctk.CTk):
             scrollbar_button_hover_color=T.INK_3,
         )
         self._tb.grid(row=1, column=0, sticky="nsew",
-                      padx=T.SPACE["md"], pady=(0, T.SPACE["md"]))
+                      padx=T.SPACE["md"], pady=(0, 0))
         self._tb.bind("<<Modified>>", self._on_modified)
         self._tb.bind("<KeyRelease>", self._update_count)
+
+        # Caret readout. Tinting tells you a character is not the plain
+        # ASCII one; it cannot tell you *which* of six identical-looking
+        # dashes it is, because they are identical-looking. This names the
+        # one under the caret outright, which is the only thing that can.
+        footer = ctk.CTkFrame(editor_card, fg_color="transparent")
+        footer.grid(row=2, column=0, sticky="ew",
+                    padx=T.SPACE["md"], pady=(4, T.SPACE["md"]))
+        footer.grid_columnconfigure(1, weight=1)
+        self._caret_var = tk.StringVar(value="Ln 1, Col 1")
+        ctk.CTkLabel(footer, textvariable=self._caret_var, font=T.font("micro"),
+                     text_color=T.INK_3, anchor="w").grid(
+            row=0, column=0, sticky="w")
+        self._char_var = tk.StringVar(value="")
+        self._char_lbl = ctk.CTkLabel(footer, textvariable=self._char_var,
+                                      font=T.font("micro"), text_color=T.INK_2,
+                                      anchor="e")
+        self._char_lbl.grid(row=0, column=1, sticky="e")
+        for seq in ("<KeyRelease>", "<ButtonRelease-1>", "<<Selection>>"):
+            self._tb.bind(seq, self._update_caret_readout, add="+")
 
         # Inspector
         insp = ctk.CTkFrame(page, **T.card_kwargs())
@@ -1011,6 +1170,25 @@ class HumanTyperApp(ctk.CTk):
                          text_color=T.INK, anchor="e").grid(
                 row=r, column=1, sticky="e", pady=4)
             r += 1
+
+        # ---- Look-alikes ------------------------------------------------
+        # The editor cannot tell these apart by shape, so they get named.
+        ctk.CTkFrame(rows, height=T.HAIRLINE, fg_color=T.BORDER).grid(
+            row=r, column=0, columnspan=2, sticky="ew", pady=T.SPACE["sm"])
+        r += 1
+        ctk.CTkLabel(rows, text="LOOK-ALIKES", font=T.font("eyebrow"),
+                     text_color=T.INK_3, anchor="w").grid(
+            row=r, column=0, columnspan=2, sticky="w", pady=(0, 2))
+        r += 1
+        self._marks_list = ctk.CTkFrame(rows, fg_color="transparent")
+        self._marks_list.grid(row=r, column=0, columnspan=2, sticky="ew")
+        self._marks_list.grid_columnconfigure(0, weight=1)
+        self._marks_empty = ctk.CTkLabel(
+            self._marks_list,
+            text="Nothing but plain ASCII punctuation.",
+            font=T.font("small"), text_color=T.INK_3,
+            anchor="w", justify="left", wraplength=T.INSPECTOR_WIDTH - 60)
+        self._marks_empty.grid(row=0, column=0, columnspan=2, sticky="ew")
 
         actions = ctk.CTkFrame(insp, fg_color="transparent")
         actions.grid(row=3, column=0, sticky="ew",
@@ -1700,6 +1878,13 @@ class HumanTyperApp(ctk.CTk):
         rep = self.config.get("repeat", {})
         self._repeat_count_var.set(rep.get("count", "1"))
         self._repeat_sep_var.set(rep.get("separator", "\\n\\n"))
+        # Restore the Marks toggle before the draft is measured, so the
+        # editor comes up already tinted rather than tinting a beat later.
+        self._marks_on = bool(self.config.get("show_marks", False))
+        try:
+            self._marks_btn.configure(**self._marks_button_recipe())
+        except Exception:
+            pass
         # Restore draft
         draft = self.config.get("draft", "")
         if draft:
@@ -1813,13 +1998,15 @@ class HumanTyperApp(ctk.CTk):
         if hasattr(self, "_current_page"):
             self._show_page(self._current_page)
         self._cadence_draw()
+        self._refresh_marks()
 
     def _on_mode_change(self, choice):
         self._appearance = resolve_appearance(choice)
         ctk.set_appearance_mode(APPEARANCE_MODES[self._appearance])
-        # The cadence meter is a Tk canvas, so it holds flat colours and has
-        # to be repainted rather than re-themed.
+        # The cadence meter is a Tk canvas, and the editor's tags are flat
+        # Tk colours too, so both have to be repainted rather than re-themed.
         self.after(60, self._cadence_draw)
+        self.after(60, self._refresh_marks)
         self._persist_state()
 
     # =======================================================================
@@ -2048,6 +2235,10 @@ class HumanTyperApp(ctk.CTk):
         chars = len(text)
         words = len(text.split()) if text.strip() else 0
 
+        self._refresh_marks()
+        self._refresh_lookalike_list(text)
+        self._update_caret_readout()
+
         # Detailed stats
         if "chars" in getattr(self, "_stat_rows", {}):
             self._stat_rows["chars"].set(f"{chars:,}")
@@ -2069,6 +2260,166 @@ class HumanTyperApp(ctk.CTk):
             else:
                 self._stat_rows["flesch"].set("—")
                 self._stat_rows["grade"].set("—")
+
+    # =======================================================================
+    # Look-alike marks
+    # =======================================================================
+    # An em dash, an en dash and a hyphen are the same pixels in a monospace
+    # editor — see LOOKALIKES. Everything below makes them visible without
+    # touching a byte of the text: a tint in the editor and a named count in
+    # the inspector. The text that gets typed is unchanged either way.
+
+    def _marks_button_recipe(self):
+        if getattr(self, "_marks_on", False):
+            return dict(T.secondary_button_kwargs(),
+                        fg_color=T.accent("accent_soft"),
+                        text_color=T.INK)
+        return T.ghost_button_kwargs()
+
+    def _toggle_marks(self):
+        self._marks_on = not getattr(self, "_marks_on", False)
+        self.config["show_marks"] = self._marks_on
+        self._persist_state()
+        try:
+            self._marks_btn.configure(**self._marks_button_recipe())
+        except Exception:
+            pass
+        self._refresh_marks()
+        found = count_lookalikes(self._tb.get("1.0", tk.END).rstrip("\n"))
+        total = sum(found.values())
+        if not self._marks_on:
+            self._set_status("Marks off.", "ok")
+        elif total:
+            self._set_status(
+                "Marks on — %s look-alike character%s tinted."
+                % (format(total, ","), "" if total == 1 else "s"), "ok")
+        else:
+            self._set_status("Marks on — none found.", "warn")
+
+    def _configure_mark_tags(self):
+        """Declare the editor's tags in the current theme.
+
+        The find tag is declared here as well, so switching light/dark
+        repaints search hits instead of leaving last theme's yellow behind,
+        and so raising it above the marks has something to raise.
+        """
+        box = self._tb._textbox
+        for cls, (wash, ink) in T.MARKS.items():
+            box.tag_config("mark_" + cls,
+                           background=T.resolve(wash),
+                           foreground=T.resolve(ink))
+        box.tag_config("find",
+                       background=T.resolve(T.FIND_HIGHLIGHT),
+                       foreground=T.resolve(T.FIND_HIGHLIGHT_INK))
+        # A search hit must stay findable where it lands on a mark.
+        box.tag_raise("find")
+
+    def _refresh_marks(self):
+        """Re-tint the editor.
+
+        One tag_add per family rather than one per character: a document
+        pasted out of Word can hold thousands of curly quotes, and a Tcl
+        round trip each would be felt on every keystroke.
+
+        Zero-width characters are the awkward case — a tint on something
+        with no width draws nothing — so an invisible character tints the
+        character standing in front of it instead. The inspector names it
+        either way, which is the part that cannot be fooled.
+        """
+        tb = getattr(self, "_tb", None)
+        if tb is None:
+            return
+        box = tb._textbox
+        for cls in T.MARKS:
+            box.tag_remove("mark_" + cls, "1.0", tk.END)
+        if not getattr(self, "_marks_on", False):
+            return
+        self._configure_mark_tags()
+
+        spans = {cls: [] for cls in T.MARKS}
+        for row, line in enumerate(tb.get("1.0", tk.END).split("\n"), start=1):
+            last = len(line) - 1
+            for m in MARK_RE.finditer(line):
+                col = m.start()
+                cls = MARKED[m.group()]
+                if cls != "hidden":
+                    lo, hi = col, col + 1
+                elif col < last:
+                    lo, hi = col, col + 2      # borrow the next character
+                elif col:
+                    lo, hi = col - 1, col + 1  # end of line: the previous one
+                else:
+                    continue                   # alone on the line: nothing to tint
+                spans[cls] += ["%d.%d" % (row, lo), "%d.%d" % (row, hi)]
+        for cls, pairs in spans.items():
+            if pairs:
+                box.tag_add("mark_" + cls, *pairs)
+
+    def _update_caret_readout(self, _event=None):
+        """Ln/Col, and the name of the character next to the caret.
+
+        The one to the *left* is the one you just typed, so it wins. But you
+        also get here by clicking at a dash you are suspicious of, and which
+        side of it you land on is a coin toss, so the character to the right
+        is named too — with an arrow, so it is never ambiguous which one the
+        name belongs to.
+        """
+        box = getattr(self, "_tb", None)
+        if box is None:
+            return
+        try:
+            line, col = box.index("insert").split(".")
+            line, col = int(line), int(col)
+            before = box.get("insert-1c", "insert") if col else ""
+            here = box.get("insert", "insert+1c")
+        except (tk.TclError, ValueError):
+            return
+        self._caret_var.set("Ln %s, Col %s" % (format(line, ","),
+                                               format(col + 1, ",")))
+        for ch, prefix in ((before, ""), (here, "→ ")):
+            name = lookalike_name(ch) if ch else None
+            if name:
+                self._char_var.set(prefix + name)
+                cls = LOOKALIKES[ch][0]
+                try:
+                    self._char_lbl.configure(
+                        text_color=T.ERR if cls == "hidden" else T.INK)
+                except Exception:
+                    pass
+                return
+        self._char_var.set("")
+
+    def _refresh_lookalike_list(self, text):
+        """Name every look-alike in the text, with a count, in the inspector."""
+        host = getattr(self, "_marks_list", None)
+        if host is None:
+            return
+        found = count_lookalikes(text)
+        # Rebuilding a dozen labels on every keystroke flickers and costs
+        # more than the scan does, so only do it when the answer changed.
+        if found == getattr(self, "_marks_shown", None):
+            return
+        self._marks_shown = found
+        for child in host.winfo_children():
+            if child is not self._marks_empty:
+                child.destroy()
+        if not found:
+            self._marks_empty.grid()
+            return
+        self._marks_empty.grid_remove()
+        for i, (ch, n) in enumerate(found.items()):
+            cls, name, _repl = LOOKALIKES[ch]
+            wash, ink = T.MARKS[cls]
+            chip = ctk.CTkLabel(host, text=" %s " % (ch if cls != "hidden" else "·"),
+                                font=T.font("mono_sm"), width=24,
+                                corner_radius=3,
+                                fg_color=wash, text_color=ink)
+            chip.grid(row=i, column=0, sticky="w", pady=1)
+            ctk.CTkLabel(host, text="%s  ×%s" % (name.title(), format(n, ",")),
+                         font=T.font("micro"), text_color=T.INK_2,
+                         anchor="w", justify="left",
+                         wraplength=T.INSPECTOR_WIDTH - 90).grid(
+                row=i, column=1, sticky="w", padx=(6, 0), pady=1)
 
     def _estimate_type_seconds(self, text):
         """Seconds this text will take, measured by planning it for real.
@@ -2213,12 +2564,19 @@ class HumanTyperApp(ctk.CTk):
                            % (format(n, ","), "" if n == 1 else "s"))
             self._set_status("Replaced %s occurrence(s)." % format(n, ","), "ok")
 
+        def close(_event=None):
+            w.destroy()
+            # Escape is bound on "all" so it stops a typing run from any
+            # window. Without the break it would stop the run as well as
+            # closing this dialog.
+            return "break"
+
         buttons = ctk.CTkFrame(card, fg_color="transparent")
         buttons.grid(row=5, column=0, columnspan=2, sticky="ew",
                      padx=T.CARD_PAD, pady=(T.SPACE["lg"], T.SPACE["lg"]))
         buttons.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkButton(buttons, text="Close", width=80, command=w.destroy,
+        ctk.CTkButton(buttons, text="Close", width=80, command=close,
                       **T.ghost_button_kwargs()).grid(row=0, column=0, sticky="w")
         ctk.CTkButton(buttons, text="Find all", width=100,
                       command=do_find_all,
@@ -2231,10 +2589,8 @@ class HumanTyperApp(ctk.CTk):
         self._accent_widget(replace_btn, T.primary_button_kwargs)
 
         w.bind("<Return>", lambda _e: do_find_all())
-        w.bind("<Escape>", lambda _e: w.destroy())
+        w.bind("<Escape>", close)
         self._fit_dialog(w, min_width=480)
-        w.lift()
-        w.focus_force()
 
     # =======================================================================
     # Snippets
@@ -2522,6 +2878,7 @@ class HumanTyperApp(ctk.CTk):
             corrections = 0    # backspaces
             spent = 0.0        # planned seconds consumed so far
             t0 = time.time()
+            self._last_tick = 0.0
 
             for ev in events:
                 if self._stop:
@@ -2561,8 +2918,22 @@ class HumanTyperApp(ctk.CTk):
                 self._tick(typed, total, keystrokes, corrections, t0,
                            spent, planned_total)
 
-            self._record_session(typed, time.time() - t0, keystrokes, corrections)
-            self._done("Done typing ✓", "ok")
+            elapsed = time.time() - t0 - self._paused_total
+            self._tick(typed, total, keystrokes, corrections, t0,
+                       spent, planned_total, force=True)
+            self._record_session(typed, elapsed, keystrokes, corrections)
+            # Say how close the run came to its own plan. Without this the
+            # only honest answer to "is the speed setting doing anything?"
+            # is to time it by hand: the plan is exact, but the keystrokes
+            # go through the OS and into another application, and neither of
+            # those is obliged to keep up.
+            if planned_total is not None and planned_total > 0:
+                self._done(
+                    "Done typing ✓   %s planned · %s actual (%+.0f%%)"
+                    % (self._fmt_secs(planned_total), self._fmt_secs(elapsed),
+                       (elapsed / planned_total - 1) * 100), "ok")
+            else:
+                self._done("Done typing ✓", "ok")
 
         except pyautogui.FailSafeException:
             self._done("Fail-safe triggered (mouse moved to corner).", "err")
@@ -2690,15 +3061,26 @@ class HumanTyperApp(ctk.CTk):
             time.sleep(0.05)
             pyperclip.copy(saved)
 
+    # The UI cannot usefully show more than about twenty updates a second,
+    # and at the Blazing preset the loop produces a hundred. Each one was
+    # marshalled to the main thread and rewrote seven variables, a progress
+    # bar and the overlay, which backed the event queue up and made the app
+    # feel slower the faster you asked it to type.
+    TICK_INTERVAL = 0.05
+
     def _tick(self, typed, total, keystrokes, corrections, t0,
-              spent, planned_total):
-        """Report progress.
+              spent, planned_total, force=False):
+        """Report progress, at most TICK_INTERVAL apart.
 
         Two things make the numbers honest here. Elapsed time excludes any
         time spent paused, and the ETA counts the pauses still left in the
         plan rather than extrapolating from how the first line went — so it
         does not lurch when the run hits a thinking pause or a burst rest.
         """
+        now = time.time()
+        if not force and now - getattr(self, "_last_tick", 0.0) < self.TICK_INTERVAL:
+            return
+        self._last_tick = now
         pct = typed / total * 100 if total else 0
         elapsed = max(0.0, time.time() - t0 - self._paused_total)
 
@@ -2822,9 +3204,11 @@ class HumanTyperApp(ctk.CTk):
             messagebox.showerror("Invalid", "Settings must be numeric.")
             return
 
-        win = self._dialog("Dry run", "780x560")
-        win.minsize(560, 420)
-        win.resizable(True, True)
+        win = self._dialog("Dry run", self._centre_over_self(780, 560))
+        win.wm_minsize(560, 420)
+        win.wm_resizable(True, True)
+        win._current_width, win._current_height = 780, 560
+        self._show_dialog(win)
 
         card = ctk.CTkFrame(win, **T.card_kwargs())
         card.pack(fill="both", expand=True,

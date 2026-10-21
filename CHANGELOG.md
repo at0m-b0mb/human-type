@@ -1,5 +1,84 @@
 # Changelog
 
+## 1.1.0
+
+Three bugs reported from real use, and the feature the first one needed.
+
+### Look-alike characters
+
+A hyphen, an en dash and an em dash were indistinguishable in the editor.
+That is not a perception problem: measured in Menlo at the editor's own 13px,
+**six of the eight dash characters render as the identical 8x1 pixel stroke**
+— hyphen-minus, figure dash, en dash, em dash, horizontal bar and minus sign.
+Only U+2010 and U+2011 differ. Changing monospace does not help; Monaco,
+Courier New and Andale Mono collapse them the same way, because a monospace
+font's job is to give every character the same cell. `tools/make_dash_figure.py`
+re-measures it from the font file and redraws `docs/dashes.svg` from the
+result.
+
+So the editor stopped relying on the glyph:
+
+- **Marks** (new toolbar toggle) tints the four families that look like
+  something they are not — dashes, curly quotes, exotic spaces, and
+  zero-width and bidi controls. Four washes, each contrast-tested against the
+  editor and against its own ink in both themes. **Nothing in the text is
+  changed**, which the suite asserts.
+- **A caret readout** under the editor names the exact character beside the
+  cursor: `EM DASH (U+2014)`. The one to the left wins; the one to the right
+  is named with an arrow, because which side of a dash you click on is a coin
+  toss. This is the part that actually tells an en dash from an em dash.
+- **The inspector lists** every look-alike in the text, by name, with counts.
+- An invisible character has no width to tint, so it borrows the character
+  next to it rather than marking nothing.
+- Two new transforms: **Dashes to ASCII** and **Punctuation to ASCII**, for
+  when flattening is what you wanted. These do change the text, on purpose.
+
+This matters more here than in a normal editor: these are exactly the
+characters a document carries in from Word, Pages or a web page, and exactly
+the ones a target window may have no key for.
+
+### Fixed
+
+- **Find & Replace appeared to open twice.** A `CTkToplevel` is mapped the
+  moment it exists, so the window showed up at the toolkit's placeholder size
+  in the corner, then jumped to its real size and position — which reads as
+  one window closing and another opening. Dialogs are now built hidden and
+  shown once, finished. The dry-run window had the same shape of bug.
+- **Dialog sizing went through CustomTkinter's scaled wrappers** while being
+  handed real pixels, so at 150% display scaling a dialog came out half again
+  too big. It also meant `resizable()` scheduled a Windows titlebar repaint
+  that would have restored a still-hidden window to hidden.
+- **Recent, Transform and Variable did nothing.** `_popup()` called itself,
+  so every one of those three buttons raised `RecursionError` into Tk's
+  callback handler, which prints to stderr and swallows it.
+- **Escape inside Find & Replace also stopped a typing run**, because the
+  dialog binding did not stop the event reaching the application-wide one.
+- **Search highlights did not follow a theme change**, keeping the light
+  theme's yellow in dark mode.
+
+### Speed and the options
+
+Progress was posted to the interface on **every keystroke** — a hundred
+updates a second at the Blazing preset, each rewriting seven variables, a
+progress bar and the overlay. It is now capped at twenty a second, which is
+more than an eye can use. Measured on this machine, the loop's own overhead
+dropped from 1.19 to 1.02 ms per keystroke.
+
+A finished run now reports **planned versus actual** time, so "is the speed
+setting doing anything?" has a number instead of an impression. For the
+record, measured over 30 seeds on a 792-character passage, the plans are not
+subtle: Slow/Natural 42 WPM, Normal/Natural 74, Fast/Natural 132,
+Blazing/Robotic 1,033. What the plan cannot control is whether the receiving
+application drains keystrokes as fast as they are posted.
+
+### Tests
+
+153 tests, up from 129. New: the look-alike table and both transforms, the
+marks never altering the text, zero-width characters still being marked, the
+caret readout naming both neighbours, dialogs being hidden until finished and
+shown at their final size, Escape not leaking, popup menus posting instead of
+recursing, and the four mark washes against WCAG in both themes.
+
 ## 1.0.0
 
 The interface was rebuilt from scratch and the typing engine was rewritten as
