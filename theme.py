@@ -342,6 +342,33 @@ def menu_kwargs():
 FIND_HIGHLIGHT = ("#F6E27A", "#5E4E12")
 FIND_HIGHLIGHT_INK = ("#15151C", "#F2F0EA")
 
+# ---------------------------------------------------------------------------
+# Look-alike character marks
+# ---------------------------------------------------------------------------
+# A monospace font gives every dash the same cell, so at editor sizes a
+# hyphen, a non-breaking hyphen, a figure dash, an en dash, an em dash and a
+# minus sign all come out as the identical 8x1 stroke. That is measured in
+# Menlo at 13px, not guessed, and Monaco, Courier New and Andale Mono do the
+# same — no choice of monospace fixes it. So the editor tints them instead:
+# one wash per family, each carrying its own ink, and every character named
+# in full in the inspector. Nothing in the text itself is touched.
+MARK_DASH        = ("#F5C98A", "#6B4512")   # hyphen, dashes, minus
+MARK_DASH_INK    = ("#3A2302", "#FBEAD4")
+MARK_QUOTE       = ("#AFCDEF", "#1A4E78")   # curly quotes and apostrophes
+MARK_QUOTE_INK   = ("#0C2A47", "#DCEAF8")
+MARK_SPACE       = ("#A9DCB8", "#1A5634")   # non-breaking and exotic spaces
+MARK_SPACE_INK   = ("#07301A", "#DBF0E2")
+MARK_HIDDEN      = ("#F0ADAD", "#7E2020")   # zero-width and bidi controls
+MARK_HIDDEN_INK  = ("#541010", "#FADCDC")
+
+# class key -> (wash, ink). The editor builds one Tk tag per entry.
+MARKS = {
+    "dash":   (MARK_DASH, MARK_DASH_INK),
+    "quote":  (MARK_QUOTE, MARK_QUOTE_INK),
+    "space":  (MARK_SPACE, MARK_SPACE_INK),
+    "hidden": (MARK_HIDDEN, MARK_HIDDEN_INK),
+}
+
 
 def option_menu_kwargs():
     return dict(fg_color=SURFACE_ALT, button_color=SURFACE_ALT,

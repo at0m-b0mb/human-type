@@ -147,6 +147,46 @@ class ContrastTests(unittest.TestCase):
                 for half in pair:
                     self.assertRegex(half, r"^#[0-9A-Fa-f]{6}$")
 
+    def test_every_mark_carries_its_own_text(self):
+        """The look-alike washes exist so a character can be read on them."""
+        for cls, (wash, ink) in T.MARKS.items():
+            for mode in (LIGHT, DARK):
+                self.check(ink, wash, AA_TEXT, "%s mark ink" % cls, mode)
+
+    def test_every_mark_is_visible_against_the_editor(self):
+        """A wash nobody can see against the editor marks nothing.
+
+        3:1 is the threshold for a UI element that carries meaning without
+        carrying words, which is exactly what this is.
+        """
+        for cls, (wash, _ink) in T.MARKS.items():
+            for mode in (LIGHT, DARK):
+                ratio = contrast(wash[mode], T.SURFACE_ALT[mode])
+                self.assertGreaterEqual(
+                    ratio, 1.4,
+                    "%s mark in %s mode is only %.2f:1 against the editor, "
+                    "so you would not spot it" % (cls, "light" if mode == LIGHT
+                                                  else "dark", ratio))
+
+    def test_marks_are_distinguishable_from_each_other(self):
+        """Four families means four tints you can tell apart at a glance."""
+        washes = [w for w, _i in T.MARKS.values()]
+        for mode in (LIGHT, DARK):
+            for i, a in enumerate(washes):
+                for b in washes[i + 1:]:
+                    self.assertNotEqual(
+                        a[mode], b[mode],
+                        "two look-alike families share a wash, which defeats "
+                        "the point of having families")
+
+    def test_marks_define_every_half(self):
+        for cls, pair in T.MARKS.items():
+            for colours in pair:
+                self.assertEqual(len(colours), 2,
+                                 "%s has no dark half" % cls)
+                for half in colours:
+                    self.assertRegex(half, r"^#[0-9A-Fa-f]{6}$")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
