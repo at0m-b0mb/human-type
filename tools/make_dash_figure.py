@@ -45,11 +45,31 @@ FONTS = [
 
 SIZE = 13          # the editor's own size
 ZOOM = 8           # one font pixel becomes this many SVG units
-INK = "#15151C"
-PAPER = "#FAF8F3"
-RULE = "#E4DFD5"
-LABEL = "#6A6A77"
-WASH = "#F5C98A"
+
+# Both figures theme themselves twice over, because they are read in two
+# places. Inlined into the site by tools/make_site.py they inherit the page's
+# --ink / --surface / --rule tokens and follow whichever theme the reader is
+# in. Loaded as an <img> in the README they are an isolated document that
+# inherits nothing, so they carry their own prefers-color-scheme block and
+# flip themselves. `var(--ink, var(--fig-ink))` serves both: the page's token
+# wins where there is one, the figure's own where there is not.
+STYLE = """<style>
+:root{--fig-ink:#15151C;--fig-paper:#FAF8F3;--fig-rule:#E4DFD5;
+--fig-label:#6A6A77;--fig-wash:#C98A2E}
+@media (prefers-color-scheme: dark){:root{
+--fig-ink:#F2F0EA;--fig-paper:#141415;--fig-rule:#242425;
+--fig-label:#8C8C89;--fig-wash:#D3A648}}
+.l{font:600 11px ui-sans-serif,system-ui,sans-serif;
+fill:var(--ink-3,var(--fig-label));letter-spacing:.06em}
+.n{font:11px ui-monospace,monospace;fill:var(--ink-3,var(--fig-label))}
+.h{font:600 10px ui-sans-serif,system-ui,sans-serif;
+fill:var(--ink,var(--fig-ink));letter-spacing:.1em}
+.paper{fill:var(--surface,var(--fig-paper))}
+.ink{fill:var(--ink,var(--fig-ink))}
+.wash{fill:var(--warn,var(--fig-wash))}
+.rule{stroke:var(--rule,var(--fig-rule))}
+.rulef{fill:var(--rule,var(--fig-rule))}
+</style>"""
 
 
 def measure(font_path, size):
@@ -104,18 +124,12 @@ def svg(measurements, font_name):
         'aria-label="%d dash characters rendered at %dpx; %d of them are the '
         'same stroke, pixel for pixel">'
         % (width, height, width, height, len(ROWS), SIZE, same),
-        '<style>'
-        '.l{font:600 11px ui-sans-serif,system-ui,sans-serif;'
-        'fill:%s;letter-spacing:.06em}'
-        '.n{font:11px ui-monospace,monospace;fill:%s}'
-        '.h{font:600 10px ui-sans-serif,system-ui,sans-serif;'
-        'fill:%s;letter-spacing:.1em}'
-        '</style>' % (LABEL, LABEL, LABEL),
-        '<rect width="%d" height="%d" fill="%s"/>' % (width, height, PAPER),
+        STYLE,
+        '<rect width="%d" height="%d" class="paper"/>' % (width, height),
         '<text class="h" x="16" y="22">CHARACTER</text>',
         '<text class="h" x="%d" y="22">INK, %d\u00d7 ACTUAL</text>' % (left, ZOOM),
         '<text class="h" x="%d" y="22">MEASURED</text>' % (left + cell + 16),
-        '<line x1="16" y1="32" x2="%d" y2="32" stroke="%s"/>' % (width - 16, RULE),
+        '<line x1="16" y1="32" x2="%d" y2="32" class="rule"/>' % (width - 16),
     ]
     for i, (label, ch) in enumerate(ROWS):
         y = 54 + i * row_h
@@ -125,20 +139,20 @@ def svg(measurements, font_name):
                      % (code_x, y + 4, ord(ch)))
         # the cell the monospace font forces every one of them into
         parts.append('<rect x="%d" y="%d" width="%d" height="%d" fill="none" '
-                     'stroke="%s" stroke-dasharray="2 3"/>'
-                     % (left, y - 16, int(adv * ZOOM), 24, RULE))
+                     'class="rule" stroke-dasharray="2 3"/>'
+                     % (left, y - 16, int(adv * ZOOM), 24))
         # the ink, at the size it actually occupies
-        parts.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>'
+        parts.append('<rect x="%d" y="%d" width="%d" height="%d" class="ink"/>'
                      % (left + (int(adv * ZOOM) - w * ZOOM) // 2,
                         y - 4 - max(2, h * ZOOM) // 2,
-                        w * ZOOM, max(2, h * ZOOM), INK))
+                        w * ZOOM, max(2, h * ZOOM)))
         parts.append('<text class="n" x="%d" y="%d">%d \u00d7 %d px</text>'
                      % (left + cell + 16, y + 4, w, h))
         if i:
-            parts.append('<line x1="16" y1="%d" x2="%d" y2="%d" stroke="%s" '
-                         'stroke-opacity=".6"/>' % (y - 25, width - 16, y - 25, RULE))
-    parts.append('<rect x="16" y="%d" width="%d" height="1" fill="%s"/>'
-                 % (height - 26, width - 32, RULE))
+            parts.append('<line x1="16" y1="%d" x2="%d" y2="%d" class="rule" '
+                         'stroke-opacity=".6"/>' % (y - 25, width - 16, y - 25))
+    parts.append('<rect x="16" y="%d" width="%d" height="1" class="rulef"/>'
+                 % (height - 26, width - 32))
     parts.append('<text class="n" x="16" y="%d">%s at %dpx, the editor\u2019s own '
                  'size \u2014 %d of these %d are the same pixels.</text>'
                  % (height - 10, font_name, SIZE, same, len(ROWS)))
@@ -212,11 +226,8 @@ def write_faces_figure(out=FACES_OUTPUT):
         'measured in each editor face; the monospace face draws all three the '
         'same width and the proportional faces do not">'
         % (width, height, width, height),
-        '<style>.l{font:600 11px ui-sans-serif,system-ui,sans-serif;fill:%s}'
-        '.n{font:11px ui-monospace,monospace;fill:%s}'
-        '.h{font:600 10px ui-sans-serif,system-ui,sans-serif;fill:%s;'
-        'letter-spacing:.1em}</style>' % (LABEL, LABEL, INK),
-        '<rect width="%d" height="%d" fill="%s"/>' % (width, height, PAPER),
+        STYLE,
+        '<rect width="%d" height="%d" class="paper"/>' % (width, height),
     ]
     y = 34
     for name, path, size in usable:
@@ -234,14 +245,14 @@ def write_faces_figure(out=FACES_OUTPUT):
             parts.append('<text class="l" x="16" y="%d">%s</text>' % (y + 4, label))
             parts.append('<text class="n" x="%d" y="%d">U+%04X</text>'
                          % (label_w, y + 4, ord(ch)))
-            parts.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>'
+            parts.append('<rect x="%d" y="%d" width="%d" height="%d" class="%s"/>'
                          % (left, y - 5, max(2, int(round(w)) * zoom), 7,
-                            WASH if same else INK))
+                            "wash" if same else "ink"))
             parts.append('<text class="n" x="%d" y="%d">%d px</text>'
                          % (left + 16 * zoom + 14, y + 4, round(w)))
         y += 24
-        parts.append('<line x1="16" y1="%d" x2="%d" y2="%d" stroke="%s"/>'
-                     % (y - 14, width - 16, y - 14, RULE))
+        parts.append('<line x1="16" y1="%d" x2="%d" y2="%d" class="rule"/>'
+                     % (y - 14, width - 16, y - 14))
     parts.append('</svg>')
     with open(out, "w", encoding="utf-8") as fh:
         fh.write("\n".join(parts))

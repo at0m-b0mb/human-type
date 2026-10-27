@@ -327,60 +327,76 @@
 
     <figure class="tight">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 342" width="520" height="342" role="img" aria-label="8 dash characters rendered at 13px; 6 of them are the same stroke, pixel for pixel">
-<style>.l{font:600 11px ui-sans-serif,system-ui,sans-serif;fill:#6A6A77;letter-spacing:.06em}.n{font:11px ui-monospace,monospace;fill:#6A6A77}.h{font:600 10px ui-sans-serif,system-ui,sans-serif;fill:#6A6A77;letter-spacing:.1em}</style>
-<rect width="520" height="342" fill="#FAF8F3"/>
+<style>
+:root{--fig-ink:#15151C;--fig-paper:#FAF8F3;--fig-rule:#E4DFD5;
+--fig-label:#6A6A77;--fig-wash:#C98A2E}
+@media (prefers-color-scheme: dark){:root{
+--fig-ink:#F2F0EA;--fig-paper:#141415;--fig-rule:#242425;
+--fig-label:#8C8C89;--fig-wash:#D3A648}}
+.l{font:600 11px ui-sans-serif,system-ui,sans-serif;
+fill:var(--ink-3,var(--fig-label));letter-spacing:.06em}
+.n{font:11px ui-monospace,monospace;fill:var(--ink-3,var(--fig-label))}
+.h{font:600 10px ui-sans-serif,system-ui,sans-serif;
+fill:var(--ink,var(--fig-ink));letter-spacing:.1em}
+.paper{fill:var(--surface,var(--fig-paper))}
+.ink{fill:var(--ink,var(--fig-ink))}
+.wash{fill:var(--warn,var(--fig-wash))}
+.rule{stroke:var(--rule,var(--fig-rule))}
+.rulef{fill:var(--rule,var(--fig-rule))}
+</style>
+<rect width="520" height="342" class="paper"/>
 <text class="h" x="16" y="22">CHARACTER</text>
 <text class="h" x="288" y="22">INK, 8× ACTUAL</text>
 <text class="h" x="408" y="22">MEASURED</text>
-<line x1="16" y1="32" x2="504" y2="32" stroke="#E4DFD5"/>
+<line x1="16" y1="32" x2="504" y2="32" class="rule"/>
 <text class="l" x="16" y="58">HYPHEN-MINUS</text>
 <text class="n" x="200" y="58">U+002D</text>
-<rect x="288" y="38" width="64" height="24" fill="none" stroke="#E4DFD5" stroke-dasharray="2 3"/>
-<rect x="288" y="46" width="64" height="8" fill="#15151C"/>
+<rect x="288" y="38" width="64" height="24" fill="none" class="rule" stroke-dasharray="2 3"/>
+<rect x="288" y="46" width="64" height="8" class="ink"/>
 <text class="n" x="408" y="58">8 × 1 px</text>
 <text class="l" x="16" y="92">HYPHEN</text>
 <text class="n" x="200" y="92">U+2010</text>
-<rect x="288" y="72" width="64" height="24" fill="none" stroke="#E4DFD5" stroke-dasharray="2 3"/>
-<rect x="304" y="80" width="32" height="8" fill="#15151C"/>
+<rect x="288" y="72" width="64" height="24" fill="none" class="rule" stroke-dasharray="2 3"/>
+<rect x="304" y="80" width="32" height="8" class="ink"/>
 <text class="n" x="408" y="92">4 × 1 px</text>
-<line x1="16" y1="63" x2="504" y2="63" stroke="#E4DFD5" stroke-opacity=".6"/>
+<line x1="16" y1="63" x2="504" y2="63" class="rule" stroke-opacity=".6"/>
 <text class="l" x="16" y="126">NON-BREAKING HYPHEN</text>
 <text class="n" x="200" y="126">U+2011</text>
-<rect x="288" y="106" width="64" height="24" fill="none" stroke="#E4DFD5" stroke-dasharray="2 3"/>
-<rect x="304" y="114" width="32" height="8" fill="#15151C"/>
+<rect x="288" y="106" width="64" height="24" fill="none" class="rule" stroke-dasharray="2 3"/>
+<rect x="304" y="114" width="32" height="8" class="ink"/>
 <text class="n" x="408" y="126">4 × 1 px</text>
-<line x1="16" y1="97" x2="504" y2="97" stroke="#E4DFD5" stroke-opacity=".6"/>
+<line x1="16" y1="97" x2="504" y2="97" class="rule" stroke-opacity=".6"/>
 <text class="l" x="16" y="160">FIGURE DASH</text>
 <text class="n" x="200" y="160">U+2012</text>
-<rect x="288" y="140" width="64" height="24" fill="none" stroke="#E4DFD5" stroke-dasharray="2 3"/>
-<rect x="288" y="148" width="64" height="8" fill="#15151C"/>
+<rect x="288" y="140" width="64" height="24" fill="none" class="rule" stroke-dasharray="2 3"/>
+<rect x="288" y="148" width="64" height="8" class="ink"/>
 <text class="n" x="408" y="160">8 × 1 px</text>
-<line x1="16" y1="131" x2="504" y2="131" stroke="#E4DFD5" stroke-opacity=".6"/>
+<line x1="16" y1="131" x2="504" y2="131" class="rule" stroke-opacity=".6"/>
 <text class="l" x="16" y="194">EN DASH</text>
 <text class="n" x="200" y="194">U+2013</text>
-<rect x="288" y="174" width="64" height="24" fill="none" stroke="#E4DFD5" stroke-dasharray="2 3"/>
-<rect x="288" y="182" width="64" height="8" fill="#15151C"/>
+<rect x="288" y="174" width="64" height="24" fill="none" class="rule" stroke-dasharray="2 3"/>
+<rect x="288" y="182" width="64" height="8" class="ink"/>
 <text class="n" x="408" y="194">8 × 1 px</text>
-<line x1="16" y1="165" x2="504" y2="165" stroke="#E4DFD5" stroke-opacity=".6"/>
+<line x1="16" y1="165" x2="504" y2="165" class="rule" stroke-opacity=".6"/>
 <text class="l" x="16" y="228">EM DASH</text>
 <text class="n" x="200" y="228">U+2014</text>
-<rect x="288" y="208" width="64" height="24" fill="none" stroke="#E4DFD5" stroke-dasharray="2 3"/>
-<rect x="288" y="216" width="64" height="8" fill="#15151C"/>
+<rect x="288" y="208" width="64" height="24" fill="none" class="rule" stroke-dasharray="2 3"/>
+<rect x="288" y="216" width="64" height="8" class="ink"/>
 <text class="n" x="408" y="228">8 × 1 px</text>
-<line x1="16" y1="199" x2="504" y2="199" stroke="#E4DFD5" stroke-opacity=".6"/>
+<line x1="16" y1="199" x2="504" y2="199" class="rule" stroke-opacity=".6"/>
 <text class="l" x="16" y="262">HORIZONTAL BAR</text>
 <text class="n" x="200" y="262">U+2015</text>
-<rect x="288" y="242" width="64" height="24" fill="none" stroke="#E4DFD5" stroke-dasharray="2 3"/>
-<rect x="288" y="250" width="64" height="8" fill="#15151C"/>
+<rect x="288" y="242" width="64" height="24" fill="none" class="rule" stroke-dasharray="2 3"/>
+<rect x="288" y="250" width="64" height="8" class="ink"/>
 <text class="n" x="408" y="262">8 × 1 px</text>
-<line x1="16" y1="233" x2="504" y2="233" stroke="#E4DFD5" stroke-opacity=".6"/>
+<line x1="16" y1="233" x2="504" y2="233" class="rule" stroke-opacity=".6"/>
 <text class="l" x="16" y="296">MINUS SIGN</text>
 <text class="n" x="200" y="296">U+2212</text>
-<rect x="288" y="276" width="64" height="24" fill="none" stroke="#E4DFD5" stroke-dasharray="2 3"/>
-<rect x="288" y="284" width="64" height="8" fill="#15151C"/>
+<rect x="288" y="276" width="64" height="24" fill="none" class="rule" stroke-dasharray="2 3"/>
+<rect x="288" y="284" width="64" height="8" class="ink"/>
 <text class="n" x="408" y="296">8 × 1 px</text>
-<line x1="16" y1="267" x2="504" y2="267" stroke="#E4DFD5" stroke-opacity=".6"/>
-<rect x="16" y="316" width="488" height="1" fill="#E4DFD5"/>
+<line x1="16" y1="267" x2="504" y2="267" class="rule" stroke-opacity=".6"/>
+<rect x="16" y="316" width="488" height="1" class="rulef"/>
 <text class="n" x="16" y="332">Menlo at 13px, the editor’s own size — 6 of these 8 are the same pixels.</text>
 </svg>
       <figcaption>
@@ -407,50 +423,66 @@
 
     <figure class="tight">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 486 366" width="486" height="366" role="img" aria-label="The same three dashes measured in each editor face; the monospace face draws all three the same width and the proportional faces do not">
-<style>.l{font:600 11px ui-sans-serif,system-ui,sans-serif;fill:#6A6A77}.n{font:11px ui-monospace,monospace;fill:#6A6A77}.h{font:600 10px ui-sans-serif,system-ui,sans-serif;fill:#15151C;letter-spacing:.1em}</style>
-<rect width="486" height="366" fill="#FAF8F3"/>
+<style>
+:root{--fig-ink:#15151C;--fig-paper:#FAF8F3;--fig-rule:#E4DFD5;
+--fig-label:#6A6A77;--fig-wash:#C98A2E}
+@media (prefers-color-scheme: dark){:root{
+--fig-ink:#F2F0EA;--fig-paper:#141415;--fig-rule:#242425;
+--fig-label:#8C8C89;--fig-wash:#D3A648}}
+.l{font:600 11px ui-sans-serif,system-ui,sans-serif;
+fill:var(--ink-3,var(--fig-label));letter-spacing:.06em}
+.n{font:11px ui-monospace,monospace;fill:var(--ink-3,var(--fig-label))}
+.h{font:600 10px ui-sans-serif,system-ui,sans-serif;
+fill:var(--ink,var(--fig-ink));letter-spacing:.1em}
+.paper{fill:var(--surface,var(--fig-paper))}
+.ink{fill:var(--ink,var(--fig-ink))}
+.wash{fill:var(--warn,var(--fig-wash))}
+.rule{stroke:var(--rule,var(--fig-rule))}
+.rulef{fill:var(--rule,var(--fig-rule))}
+</style>
+<rect width="486" height="366" class="paper"/>
 <text class="h" x="16" y="34">MONO · MENLO 13px — ALL THE SAME WIDTH</text>
 <text class="l" x="16" y="74">hyphen</text>
 <text class="n" x="108" y="74">U+002D</text>
-<rect x="176" y="65" width="80" height="7" fill="#F5C98A"/>
+<rect x="176" y="65" width="80" height="7" class="wash"/>
 <text class="n" x="350" y="74">8 px</text>
 <text class="l" x="16" y="100">en dash</text>
 <text class="n" x="108" y="100">U+2013</text>
-<rect x="176" y="91" width="80" height="7" fill="#F5C98A"/>
+<rect x="176" y="91" width="80" height="7" class="wash"/>
 <text class="n" x="350" y="100">8 px</text>
 <text class="l" x="16" y="126">em dash</text>
 <text class="n" x="108" y="126">U+2014</text>
-<rect x="176" y="117" width="80" height="7" fill="#F5C98A"/>
+<rect x="176" y="117" width="80" height="7" class="wash"/>
 <text class="n" x="350" y="126">8 px</text>
-<line x1="16" y1="132" x2="470" y2="132" stroke="#E4DFD5"/>
+<line x1="16" y1="132" x2="470" y2="132" class="rule"/>
 <text class="h" x="16" y="146">SANS · SFNS 14px — THREE WIDTHS</text>
 <text class="l" x="16" y="186">hyphen</text>
 <text class="n" x="108" y="186">U+002D</text>
-<rect x="176" y="177" width="60" height="7" fill="#15151C"/>
+<rect x="176" y="177" width="60" height="7" class="ink"/>
 <text class="n" x="350" y="186">6 px</text>
 <text class="l" x="16" y="212">en dash</text>
 <text class="n" x="108" y="212">U+2013</text>
-<rect x="176" y="203" width="90" height="7" fill="#15151C"/>
+<rect x="176" y="203" width="90" height="7" class="ink"/>
 <text class="n" x="350" y="212">9 px</text>
 <text class="l" x="16" y="238">em dash</text>
 <text class="n" x="108" y="238">U+2014</text>
-<rect x="176" y="229" width="130" height="7" fill="#15151C"/>
+<rect x="176" y="229" width="130" height="7" class="ink"/>
 <text class="n" x="350" y="238">13 px</text>
-<line x1="16" y1="244" x2="470" y2="244" stroke="#E4DFD5"/>
+<line x1="16" y1="244" x2="470" y2="244" class="rule"/>
 <text class="h" x="16" y="258">SERIF · IOWAN OLD STYLE 15px — THREE WIDTHS</text>
 <text class="l" x="16" y="298">hyphen</text>
 <text class="n" x="108" y="298">U+002D</text>
-<rect x="176" y="289" width="50" height="7" fill="#15151C"/>
+<rect x="176" y="289" width="50" height="7" class="ink"/>
 <text class="n" x="350" y="298">5 px</text>
 <text class="l" x="16" y="324">en dash</text>
 <text class="n" x="108" y="324">U+2013</text>
-<rect x="176" y="315" width="80" height="7" fill="#15151C"/>
+<rect x="176" y="315" width="80" height="7" class="ink"/>
 <text class="n" x="350" y="324">8 px</text>
 <text class="l" x="16" y="350">em dash</text>
 <text class="n" x="108" y="350">U+2014</text>
-<rect x="176" y="341" width="150" height="7" fill="#15151C"/>
+<rect x="176" y="341" width="150" height="7" class="ink"/>
 <text class="n" x="350" y="350">15 px</text>
-<line x1="16" y1="356" x2="470" y2="356" stroke="#E4DFD5"/>
+<line x1="16" y1="356" x2="470" y2="356" class="rule"/>
 </svg>
       <figcaption>
         Same three characters, same method: every bar is a measurement.
