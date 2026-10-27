@@ -187,6 +187,32 @@ class ContrastTests(unittest.TestCase):
                 for half in colours:
                     self.assertRegex(half, r"^#[0-9A-Fa-f]{6}$")
 
+class EditorFaceTests(unittest.TestCase):
+    """Structure only — measuring a font needs a display, so that lives in
+    test_ui.py. These run in the dependency-free CI job."""
+
+    def test_every_face_points_at_a_font_this_module_defines(self):
+        for key, (role, _label, _gain, _cost) in T.EDITOR_FACES.items():
+            self.assertIn(role, T._TYPE,
+                          "%s names a font role that does not exist" % key)
+
+    def test_every_face_states_what_it_costs(self):
+        """A face with no downside listed is a face nobody can choose against."""
+        for key, entry in T.EDITOR_FACES.items():
+            self.assertEqual(len(entry), 4, "%s is malformed" % key)
+            _role, label, gain, cost = entry
+            for text, what in ((label, "label"), (gain, "gain"), (cost, "cost")):
+                self.assertTrue(text and text.strip(),
+                                "%s has an empty %s" % (key, what))
+
+    def test_the_default_face_is_one_of_them(self):
+        self.assertIn(T.DEFAULT_EDITOR_FACE, T.EDITOR_FACES)
+
+    def test_mono_is_still_on_the_menu(self):
+        """Losing column alignment is a real cost; keep the choice."""
+        self.assertIn("Mono", T.EDITOR_FACES)
+        self.assertEqual(T.EDITOR_FACES["Mono"][0], "editor")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
