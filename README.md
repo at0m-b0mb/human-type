@@ -7,7 +7,7 @@
 Drifting rhythm, per-key effort, and mistakes noticed a beat late instead of instantly.
 Every one of them corrected before the run ends.
 
-[![Version](https://img.shields.io/badge/version-1.2.0-9C7B3A)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-9C7B3A)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/tests-164%20passing-2C6A4F)](#tests)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6B6B76)](#requirements)

@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.2.1
+
+**The two measured figures were light-theme only.** `docs/dashes.svg` and
+`docs/faces.svg` painted a hard-coded warm-paper rectangle, so on the dark
+site and in a dark README they were bright white cards in a true-black page.
+
+They theme themselves twice over now, because they are read in two places.
+Inlined into the site they inherit the page's `--ink` / `--surface` / `--rule`
+tokens and follow whichever theme the reader is in. Loaded as an `<img>` in
+the README they are an isolated document that inherits nothing, so they carry
+their own `prefers-color-scheme` block and flip themselves.
+`var(--ink, var(--fig-ink))` serves both: the page's token wins where there is
+one, the figure's own where there is not. Verified in both schemes and both
+contexts.
+
+This was the house rule the palette has enforced since 1.0 — every colour
+declared as a light/dark pair at the point of definition — being quietly
+skipped by two files that generate their colours instead of declaring them.
+
 ## 1.2.0
 
 **The look-alike dashes are fixed properly, and the clue was in the app all
