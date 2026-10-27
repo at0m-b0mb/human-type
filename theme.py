@@ -66,18 +66,87 @@ _TYPE = {
     "metric_sm":  (SERIF, 18, "normal", "roman"),
     "mono":       (MONO,  12, "normal", "roman"),
     "mono_sm":    (MONO,  11, "normal", "roman"),
-    "editor":     (MONO,  13, "normal", "roman"),
+    # Three faces for the editor. See EDITOR_FACES below for why.
+    "editor":       (MONO,  13, "normal", "roman"),
+    "editor_sans":  (SANS,  14, "normal", "roman"),
+    "editor_serif": (SERIF, 15, "normal", "roman"),
 }
 
+# ---------------------------------------------------------------------------
+# Editor faces
+# ---------------------------------------------------------------------------
+# The editor was monospace and nothing else, which is why a hyphen, an en dash
+# and an em dash came out as the same stroke: a monospace font gives every
+# character one cell, so an em dash physically cannot be longer than a hyphen.
+# A proportional face has no such constraint and draws all three at their real
+# widths — which is why the same characters always looked right in the Find &
+# Replace box, a proportional CTkEntry, and wrong six inches above it.
+#
+# So the face is a choice now. Nothing here *asserts* a face separates them;
+# `font_separates_dashes()` measures the face that is actually loaded, because
+# which fonts exist is a property of the machine, not of this file.
+#
+# key -> (font role, menu label, what you gain, what you give up)
+EDITOR_FACES = {
+    "Mono":  ("editor",       "Mono",
+              "Aligned columns and visible runs of spaces.",
+              "Every dash is one cell wide, so they look identical."),
+    "Sans":  ("editor_sans",  "Sans",
+              "Dashes at their real widths. Closest to a chat box or a form.",
+              "No column alignment."),
+    "Serif": ("editor_serif", "Serif",
+              "Dashes at their real widths, and easiest on long prose.",
+              "No column alignment."),
+}
+
+DEFAULT_EDITOR_FACE = "Sans"
+
+
+def font_separates_dashes(role, root=None):
+    """Does this font draw - , – and — at three different widths?
+
+    Returns (ok, widths in pixels). Measured from the font Tk actually
+    loaded, never inferred from the family name in _TYPE: ask for a font that
+    is not installed and Tk substitutes one silently, so the name proves
+    nothing about the glyphs that reach the screen. The measuring font is
+    built fresh against `root` rather than taken from the cache, so the
+    answer belongs to the interpreter you are asking about.
+    """
+    import tkinter.font as tkfont
+    family, size, weight, slant = _TYPE[role]
+    f = tkfont.Font(root=root or _current_root(), family=family, size=size,
+                    weight=weight, slant=slant)
+    widths = tuple(f.measure(c) for c in ("-", "\u2013", "\u2014"))
+    return len(set(widths)) == 3 and widths[0] < widths[1] < widths[2], widths
+
 _font_cache = {}
+_font_cache_root = None
+
+
+def _current_root():
+    import tkinter
+    return getattr(tkinter, "_default_root", None)
 
 
 def font(role):
-    """A CTkFont for a named role. Requires a Tk root to already exist."""
+    """A CTkFont for a named role. Requires a Tk root to already exist.
+
+    The cache is keyed to the root that built it. A Tk font belongs to one
+    interpreter, so a font cached against a destroyed root raises
+    "application has been destroyed" the moment anything *asks* it a
+    question - handing one to a widget looks fine, calling measure() on it
+    does not. Rebuilding the root is routine in the test suite and possible
+    in the app, so notice it here rather than at every call site.
+    """
+    global _font_cache_root
     if ctk is None:
         raise RuntimeError(
             "customtkinter is not installed, so fonts cannot be built. "
             "Colours and measurements in this module work without it.")
+    root = _current_root()
+    if root is not _font_cache_root:
+        _font_cache.clear()
+        _font_cache_root = root
     if role not in _font_cache:
         family, size, weight, slant = _TYPE[role]
         _font_cache[role] = ctk.CTkFont(family=family, size=size,
@@ -86,8 +155,10 @@ def font(role):
 
 
 def reset_fonts():
-    """Drop cached fonts — needed if the Tk root is ever rebuilt."""
+    """Drop cached fonts. font() also does this by itself on a new root."""
+    global _font_cache_root
     _font_cache.clear()
+    _font_cache_root = None
 
 
 # ---------------------------------------------------------------------------

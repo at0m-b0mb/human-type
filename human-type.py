@@ -59,6 +59,7 @@ DEFAULT_CONFIG = {
     "custom_snippets": {},
     "draft": "",
     "show_marks": False,
+    "editor_face": T.DEFAULT_EDITOR_FACE,
     "realism_profile": "Natural",
     "newline_mode": "Press Enter",
     "rhythm_drift": 0.11,
@@ -1102,23 +1103,47 @@ class HumanTyperApp(ctk.CTk):
         self._tb.bind("<<Modified>>", self._on_modified)
         self._tb.bind("<KeyRelease>", self._update_count)
 
-        # Caret readout. Tinting tells you a character is not the plain
-        # ASCII one; it cannot tell you *which* of six identical-looking
-        # dashes it is, because they are identical-looking. This names the
-        # one under the caret outright, which is the only thing that can.
+        # The editor footer carries the two answers to "which dash is that?".
+        #
+        # The face picker is the real fix. A monospace font gives every
+        # character one cell, so an em dash physically cannot be drawn longer
+        # than a hyphen — that is why these looked identical in the editor and
+        # correct in the Find & Replace box, which is a proportional entry. A
+        # proportional face here draws them at their true widths.
+        #
+        # The caret readout is the backstop, because no font can show a
+        # no-break space or a zero-width joiner, and a face the machine
+        # substituted might collapse them again.
         footer = ctk.CTkFrame(editor_card, fg_color="transparent")
         footer.grid(row=2, column=0, sticky="ew",
                     padx=T.SPACE["md"], pady=(4, T.SPACE["md"]))
-        footer.grid_columnconfigure(1, weight=1)
+        footer.grid_columnconfigure(2, weight=1)
+
+        self._face_var = tk.StringVar(value=T.DEFAULT_EDITOR_FACE)
+        face_menu = ctk.CTkOptionMenu(
+            footer, values=list(T.EDITOR_FACES), variable=self._face_var,
+            command=self._on_editor_face, width=84,
+            **{**T.option_menu_kwargs(), "height": 24,
+               "font": T.font("micro"), "dropdown_font": T.font("small")})
+        face_menu.grid(row=0, column=0, sticky="w", padx=(0, T.SPACE["sm"]))
+        self._accent_widget(face_menu, lambda: {
+            "dropdown_hover_color": T.accent("accent_soft")})
+
+        self._face_note = tk.StringVar(value="")
+        self._face_lbl = ctk.CTkLabel(footer, textvariable=self._face_note,
+                                      font=T.font("micro"),
+                                      text_color=T.INK_3, anchor="w")
+        self._face_lbl.grid(row=0, column=1, sticky="w")
+
         self._caret_var = tk.StringVar(value="Ln 1, Col 1")
         ctk.CTkLabel(footer, textvariable=self._caret_var, font=T.font("micro"),
-                     text_color=T.INK_3, anchor="w").grid(
-            row=0, column=0, sticky="w")
+                     text_color=T.INK_3, anchor="e").grid(
+            row=0, column=2, sticky="e", padx=(T.SPACE["md"], T.SPACE["md"]))
         self._char_var = tk.StringVar(value="")
         self._char_lbl = ctk.CTkLabel(footer, textvariable=self._char_var,
                                       font=T.font("micro"), text_color=T.INK_2,
                                       anchor="e")
-        self._char_lbl.grid(row=0, column=1, sticky="e")
+        self._char_lbl.grid(row=0, column=3, sticky="e")
         for seq in ("<KeyRelease>", "<ButtonRelease-1>", "<<Selection>>"):
             self._tb.bind(seq, self._update_caret_readout, add="+")
 
@@ -1885,6 +1910,10 @@ class HumanTyperApp(ctk.CTk):
             self._marks_btn.configure(**self._marks_button_recipe())
         except Exception:
             pass
+        face = self.config.get("editor_face", T.DEFAULT_EDITOR_FACE)
+        self._face_var.set(face if face in T.EDITOR_FACES
+                           else T.DEFAULT_EDITOR_FACE)
+        self._on_editor_face()
         # Restore draft
         draft = self.config.get("draft", "")
         if draft:
@@ -2354,6 +2383,51 @@ class HumanTyperApp(ctk.CTk):
         for cls, pairs in spans.items():
             if pairs:
                 box.tag_add("mark_" + cls, *pairs)
+
+    def _editor_face(self):
+        """The current face key, always one that exists."""
+        key = getattr(self, "_face_var", None)
+        key = key.get() if key is not None else T.DEFAULT_EDITOR_FACE
+        return key if key in T.EDITOR_FACES else T.DEFAULT_EDITOR_FACE
+
+    def _on_editor_face(self, _choice=None):
+        """Repaint the editor in the chosen face and say what it does.
+
+        The verdict is *measured*, never assumed. Tk silently substitutes a
+        font it cannot find, so the family name in theme.py proves nothing
+        about the glyphs that end up on screen — and this app's whole claim
+        is that it tells you what is actually there.
+        """
+        key = self._editor_face()
+        role = T.EDITOR_FACES[key][0]
+        face = T.font(role)
+        for box in (getattr(self, "_tb", None), getattr(self, "_dry_tb", None)):
+            if box is not None:
+                try:
+                    box.configure(font=face)
+                except Exception:
+                    pass
+
+        ok, widths = T.font_separates_dashes(role, root=self)
+        if ok:
+            self._face_note.set("– and — are %dpx and %dpx wide"
+                                % (widths[1], widths[2]))
+            colour = T.OK
+        else:
+            self._face_note.set("- – — all render %dpx wide here" % widths[0])
+            colour = T.WARN
+        try:
+            self._face_lbl.configure(text_color=colour)
+        except Exception:
+            pass
+
+        self.config["editor_face"] = key
+        self._persist_state()
+        # The marks are character ranges, not glyphs, so they survive a face
+        # change — but the tag colours are flat Tk values and the line/column
+        # metrics moved, so both get refreshed.
+        self._refresh_marks()
+        self._update_caret_readout()
 
     def _update_caret_readout(self, _event=None):
         """Ln/Col, and the name of the character next to the caret.
@@ -3221,8 +3295,11 @@ class HumanTyperApp(ctk.CTk):
             anchor="w", fill="x", padx=T.CARD_PAD,
             pady=(T.SPACE["lg"], T.SPACE["md"]))
 
-        tb = ctk.CTkTextbox(card, wrap="word", font=T.font("editor"),
-                            **T.textbox_kwargs())
+        tb = ctk.CTkTextbox(
+            card, wrap="word",
+            font=T.font(T.EDITOR_FACES[self._editor_face()][0]),
+            **T.textbox_kwargs())
+        self._dry_tb = tb
         tb.pack(fill="both", expand=True, padx=T.CARD_PAD, pady=(0, T.SPACE["md"]))
 
         prog = ctk.CTkProgressBar(card, height=4, **T.progress_kwargs())

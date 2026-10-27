@@ -7,9 +7,9 @@
 Drifting rhythm, per-key effort, and mistakes noticed a beat late instead of instantly.
 Every one of them corrected before the run ends.
 
-[![Version](https://img.shields.io/badge/version-1.1.0-9C7B3A)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-9C7B3A)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-153%20passing-2C6A4F)](#tests)
+[![Tests](https://img.shields.io/badge/tests-164%20passing-2C6A4F)](#tests)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-6B6B76)](#requirements)
 [![License](https://img.shields.io/badge/license-MIT-9C7B3A)](LICENSE)
 
@@ -188,8 +188,40 @@ document carries in from Word, Pages or a web page — and they are the ones a
 target window is most likely to have no key for. A kiosk form, a remote
 console or an exam browser on a US layout has no em dash.
 
-So the editor stopped relying on the glyph. Three things, none of which
-touches a byte of your text:
+### The fix: pick a face that can draw them
+
+The constraint is monospace, not fonts in general. A monospace font gives
+every character exactly one cell, so an em dash *physically cannot* be drawn
+longer than a hyphen. A proportional face has no such rule — which is why
+Find & Replace had been showing all three correctly the whole time, six
+inches below an editor that could not. Its entry box is a proportional
+`CTkEntry`.
+
+<div align="center">
+
+![The same three dashes measured in each editor face: the monospace face draws all three at one width, the proportional faces at three.](docs/faces.svg)
+
+</div>
+
+So the editor face is a choice, in the footer:
+
+| Face | What you gain | What you give up |
+|---|---|---|
+| **Sans** *(default)* | Dashes at their real widths. Closest to the chat box or form the text is headed for. | Column alignment |
+| **Serif** | The widest separation — an em dash is two and a half times a hyphen. | Column alignment |
+| **Mono** | Aligned columns and visible runs of spaces. | Every dash is one cell wide, so they look identical |
+
+The footer **measures the face Tk actually loaded** and reports it —
+`– and — are 9px and 13px wide`, or `- – — all render 8px wide here` in amber.
+It never trusts the family name: ask for a font that is not installed and Tk
+substitutes one silently, so the name in `theme.py` proves nothing about the
+glyphs that reach the screen.
+
+### And three things that work whatever the face
+
+No font can show a no-break space or a zero-width joiner, and on a machine
+where a face gets substituted the measurement may come back amber. So the
+rest stays, and none of it touches a byte of your text:
 
 | | |
 |---|---|
@@ -207,7 +239,7 @@ the editor background and its own ink, in both themes — same rule as the rest
 of the palette. Re-measure the collision yourself:
 
 ```bash
-python3 tools/make_dash_figure.py
+python3 tools/make_dash_figure.py --faces
 ```
 
 ## Quick start
@@ -317,8 +349,8 @@ make test-engine   # no display and no dependencies required
 |---|---:|---|
 | `tests/test_realism.py` | 30 | 62,119 individual checks — reconstruction, backspace safety, the effort model, rhythm autocorrelation, determinism |
 | `tests/test_docimport.py` | 36 | Real `.docx`/`.odt` archives built in memory, RTF, HTML, encodings, zip bombs, entity expansion, XXE, stack exhaustion |
-| `tests/test_theme.py` | 15 | Every text pairing against WCAG AA, in both themes and all six accents, including the four look-alike washes against the editor and against their own ink |
-| `tests/test_ui.py` | 72 | Every page and dialog builds, nothing falls back to the toolkit's default palette, nothing is clipped out of its own window, dialogs stay hidden until they are finished and appear at their final size, Escape does not leak past a dialog, popup menus post instead of recursing, marks tint the right characters and change none of them, settings round-trip, end-to-end typing runs reproduce their input, the typing thread never touches Tkinter, and a corrupted config never locks you out |
+| `tests/test_theme.py` | 19 | Every text pairing against WCAG AA, in both themes and all six accents, including the four look-alike washes against the editor and against their own ink |
+| `tests/test_ui.py` | 80 | Every page and dialog builds, nothing falls back to the toolkit's default palette, nothing is clipped out of its own window, dialogs stay hidden until they are finished and appear at their final size, Escape does not leak past a dialog, popup menus post instead of recursing, the default editor face provably separates the three dashes on this machine, marks tint the right characters and change none of them, settings round-trip, end-to-end typing runs reproduce their input, the typing thread never touches Tkinter, and a corrupted config never locks you out |
 
 `realism.py` and `docimport.py` import nothing outside the standard library,
 so the engine suites run anywhere Python does — no GUI, no keyboard, no

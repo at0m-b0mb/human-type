@@ -1055,6 +1055,116 @@ class LookalikeTests(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_DISPLAY, "no display available")
+class EditorFaceTests(unittest.TestCase):
+    """The editor face is the actual fix for the look-alike dashes.
+
+    A monospace font gives every character one cell, so an em dash cannot be
+    drawn longer than a hyphen. A proportional face can. This was visible all
+    along: the Find & Replace box is a proportional CTkEntry and always showed
+    the three correctly, six inches below an editor that could not.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.m = _load_app_module()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.m.CONFIG_PATH = Path(cls.tmp.name) / "config.json"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        self.app = self.m.HumanTyperApp()
+        self.app.update_idletasks()
+
+    def tearDown(self):
+        self.app.destroy()
+
+    def test_the_default_face_tells_the_three_dashes_apart(self):
+        import theme as T
+        role = T.EDITOR_FACES[T.DEFAULT_EDITOR_FACE][0]
+        ok, widths = T.font_separates_dashes(role, root=self.app)
+        self.assertTrue(
+            ok,
+            "the default editor face renders - %s %s at widths %s, so the bug "
+            "this face exists to fix is still on screen"
+            % ("\u2013", "\u2014", widths))
+
+    def test_a_monospace_face_is_still_offered_and_still_collapses_them(self):
+        """Mono is a real choice with a real cost, and we say so."""
+        import theme as T
+        self.assertIn("Mono", T.EDITOR_FACES)
+        ok, widths = T.font_separates_dashes("editor", root=self.app)
+        self.assertFalse(ok)
+        self.assertEqual(len(set(widths)), 1,
+                         "a monospace font that separates them would be news")
+
+    def test_the_footer_reports_what_it_measured(self):
+        for key in ("Mono", "Sans", "Serif"):
+            self.app._face_var.set(key)
+            self.app._on_editor_face()
+            self.app.update_idletasks()
+            note = self.app._face_note.get()
+            self.assertTrue(note, "%s face said nothing" % key)
+            if key == "Mono":
+                self.assertIn("all render", note)
+            else:
+                self.assertIn("px", note)
+
+    def test_changing_face_actually_changes_the_editor_font(self):
+        import theme as T
+        seen = set()
+        for key in T.EDITOR_FACES:
+            self.app._face_var.set(key)
+            self.app._on_editor_face()
+            self.app.update_idletasks()
+            seen.add(self.app._tb.cget("font").cget("family"))
+        self.assertGreater(len(seen), 1,
+                           "every face produced the same family")
+
+    def test_the_face_survives_a_restart(self):
+        self.app._face_var.set("Serif")
+        self.app._on_editor_face()
+        self.app.destroy()
+        import theme as T
+        T.reset_fonts()
+        self.app = self.m.HumanTyperApp()
+        self.app.update_idletasks()
+        self.assertEqual(self.app._face_var.get(), "Serif")
+
+    def test_an_unknown_face_in_the_config_falls_back(self):
+        """The config file is hostile input; a stale face must not crash."""
+        import theme as T
+        self.app._face_var.set("Blackletter")
+        self.assertEqual(self.app._editor_face(), T.DEFAULT_EDITOR_FACE)
+
+    def test_changing_face_changes_no_text(self):
+        sample = "a-b\u2013c\u2014d"
+        self.app._tb.delete("1.0", "end")
+        self.app._tb.insert("1.0", sample)
+        for key in ("Mono", "Serif", "Sans"):
+            self.app._face_var.set(key)
+            self.app._on_editor_face()
+        self.assertEqual(self.app._tb.get("1.0", "end").rstrip("\n"), sample)
+
+    def test_marks_survive_a_face_change(self):
+        """Marks are character ranges, not glyphs — a new font cannot lose them."""
+        self.app._tb.delete("1.0", "end")
+        self.app._tb.insert("1.0", "a\u2013b\u2014c")
+        self.app._update_count()
+        self.app._marks_on = False
+        self.app._toggle_marks()
+        self.app.update_idletasks()
+        before = len(self.app._tb._textbox.tag_ranges("mark_dash"))
+        self.app._face_var.set("Serif")
+        self.app._on_editor_face()
+        self.app.update_idletasks()
+        self.assertEqual(len(self.app._tb._textbox.tag_ranges("mark_dash")),
+                         before)
+
+
+@unittest.skipUnless(HAVE_DISPLAY, "no display available")
 class DialogBehaviourTests(unittest.TestCase):
     """Find & Replace used to appear twice.
 

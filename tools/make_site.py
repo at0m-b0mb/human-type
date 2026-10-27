@@ -7,7 +7,7 @@ each figure embedded at its own marker. Edit the template for prose, and the
 matching tool for the picture.
 
     python3 tools/make_rhythm_chart.py
-    python3 tools/make_dash_figure.py
+    python3 tools/make_dash_figure.py --faces
     python3 tools/make_site.py
 
 Doing it this way rather than editing the HTML in place is deliberate. The
@@ -26,6 +26,7 @@ OUTPUT = os.path.join(ROOT, "docs", "index.html")
 FIGURES = {
     "__CHART__":  (os.path.join(ROOT, "docs", "rhythm.svg"), "rhythm-title"),
     "__DASHES__": (os.path.join(ROOT, "docs", "dashes.svg"), None),
+    "__FACES__":  (os.path.join(ROOT, "docs", "faces.svg"), None),
 }
 
 

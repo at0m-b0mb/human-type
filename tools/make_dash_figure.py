@@ -150,6 +150,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--font", help="path to a monospace font file")
     ap.add_argument("--out", default=OUTPUT)
+    ap.add_argument("--faces", action="store_true",
+                    help="also write docs/faces.svg, the editor-face comparison")
     args = ap.parse_args()
 
     path = find_font(args.font)
@@ -174,6 +176,76 @@ def main():
     with open(args.out, "w", encoding="utf-8") as fh:
         fh.write(svg(measurements, name))
     print("wrote %s" % os.path.relpath(args.out, ROOT))
+
+    if args.faces:
+        write_faces_figure()
+
+
+# ---------------------------------------------------------------------------
+# The editor-face comparison
+# ---------------------------------------------------------------------------
+# The figure above shows why a monospace editor cannot distinguish the dashes.
+# This one shows the fix: the same three characters, measured in each face the
+# editor offers. Same method — every bar is a measurement, not a drawing.
+
+FACE_SAMPLES = [
+    ("Mono",  "/System/Library/Fonts/Menlo.ttc", 13),
+    ("Sans",  "/System/Library/Fonts/SFNS.ttf", 14),
+    ("Serif", "/System/Library/Fonts/Supplemental/Iowan Old Style.ttc", 15),
+]
+FACE_ROWS = [("hyphen", "\u002d"), ("en dash", "\u2013"), ("em dash", "\u2014")]
+FACES_OUTPUT = os.path.join(ROOT, "docs", "faces.svg")
+
+
+def write_faces_figure(out=FACES_OUTPUT):
+    from PIL import ImageFont
+    zoom, row_h, left, label_w = 10, 26, 176, 108
+    usable = [(n, p, s) for n, p, s in FACE_SAMPLES if os.path.exists(p)]
+    if not usable:
+        print("no sample fonts on this machine — skipping docs/faces.svg")
+        return
+    width = left + 16 * zoom + 150
+    height = 40 + (row_h * len(FACE_ROWS) + 26) * len(usable) + 14
+    parts = [
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" '
+        'width="%d" height="%d" role="img" aria-label="The same three dashes '
+        'measured in each editor face; the monospace face draws all three the '
+        'same width and the proportional faces do not">'
+        % (width, height, width, height),
+        '<style>.l{font:600 11px ui-sans-serif,system-ui,sans-serif;fill:%s}'
+        '.n{font:11px ui-monospace,monospace;fill:%s}'
+        '.h{font:600 10px ui-sans-serif,system-ui,sans-serif;fill:%s;'
+        'letter-spacing:.1em}</style>' % (LABEL, LABEL, INK),
+        '<rect width="%d" height="%d" fill="%s"/>' % (width, height, PAPER),
+    ]
+    y = 34
+    for name, path, size in usable:
+        font = ImageFont.truetype(path, size)
+        widths = [font.getlength(ch) for _lbl, ch in FACE_ROWS]
+        same = len(set(round(w) for w in widths)) == 1
+        parts.append('<text class="h" x="16" y="%d">%s · %s %dpx — %s</text>'
+                     % (y, name.upper(),
+                        os.path.splitext(os.path.basename(path))[0].upper(),
+                        size,
+                        "ALL THE SAME WIDTH" if same else "THREE WIDTHS"))
+        y += 10
+        for (label, ch), w in zip(FACE_ROWS, widths):
+            y += row_h
+            parts.append('<text class="l" x="16" y="%d">%s</text>' % (y + 4, label))
+            parts.append('<text class="n" x="%d" y="%d">U+%04X</text>'
+                         % (label_w, y + 4, ord(ch)))
+            parts.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>'
+                         % (left, y - 5, max(2, int(round(w)) * zoom), 7,
+                            WASH if same else INK))
+            parts.append('<text class="n" x="%d" y="%d">%d px</text>'
+                         % (left + 16 * zoom + 14, y + 4, round(w)))
+        y += 24
+        parts.append('<line x1="16" y1="%d" x2="%d" y2="%d" stroke="%s"/>'
+                     % (y - 14, width - 16, y - 14, RULE))
+    parts.append('</svg>')
+    with open(out, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(parts))
+    print("wrote %s" % os.path.relpath(out, ROOT))
 
 
 if __name__ == "__main__":

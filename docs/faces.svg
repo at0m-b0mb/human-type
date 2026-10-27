@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 486 366" width="486" height="366" role="img" aria-label="The same three dashes measured in each editor face; the monospace face draws all three the same width and the proportional faces do not">
+<style>.l{font:600 11px ui-sans-serif,system-ui,sans-serif;fill:#6A6A77}.n{font:11px ui-monospace,monospace;fill:#6A6A77}.h{font:600 10px ui-sans-serif,system-ui,sans-serif;fill:#15151C;letter-spacing:.1em}</style>
+<rect width="486" height="366" fill="#FAF8F3"/>
+<text class="h" x="16" y="34">MONO · MENLO 13px — ALL THE SAME WIDTH</text>
+<text class="l" x="16" y="74">hyphen</text>
+<text class="n" x="108" y="74">U+002D</text>
+<rect x="176" y="65" width="80" height="7" fill="#F5C98A"/>
+<text class="n" x="350" y="74">8 px</text>
+<text class="l" x="16" y="100">en dash</text>
+<text class="n" x="108" y="100">U+2013</text>
+<rect x="176" y="91" width="80" height="7" fill="#F5C98A"/>
+<text class="n" x="350" y="100">8 px</text>
+<text class="l" x="16" y="126">em dash</text>
+<text class="n" x="108" y="126">U+2014</text>
+<rect x="176" y="117" width="80" height="7" fill="#F5C98A"/>
+<text class="n" x="350" y="126">8 px</text>
+<line x1="16" y1="132" x2="470" y2="132" stroke="#E4DFD5"/>
+<text class="h" x="16" y="146">SANS · SFNS 14px — THREE WIDTHS</text>
+<text class="l" x="16" y="186">hyphen</text>
+<text class="n" x="108" y="186">U+002D</text>
+<rect x="176" y="177" width="60" height="7" fill="#15151C"/>
+<text class="n" x="350" y="186">6 px</text>
+<text class="l" x="16" y="212">en dash</text>
+<text class="n" x="108" y="212">U+2013</text>
+<rect x="176" y="203" width="90" height="7" fill="#15151C"/>
+<text class="n" x="350" y="212">9 px</text>
+<text class="l" x="16" y="238">em dash</text>
+<text class="n" x="108" y="238">U+2014</text>
+<rect x="176" y="229" width="130" height="7" fill="#15151C"/>
+<text class="n" x="350" y="238">13 px</text>
+<line x1="16" y1="244" x2="470" y2="244" stroke="#E4DFD5"/>
+<text class="h" x="16" y="258">SERIF · IOWAN OLD STYLE 15px — THREE WIDTHS</text>
+<text class="l" x="16" y="298">hyphen</text>
+<text class="n" x="108" y="298">U+002D</text>
+<rect x="176" y="289" width="50" height="7" fill="#15151C"/>
+<text class="n" x="350" y="298">5 px</text>
+<text class="l" x="16" y="324">en dash</text>
+<text class="n" x="108" y="324">U+2013</text>
+<rect x="176" y="315" width="80" height="7" fill="#15151C"/>
+<text class="n" x="350" y="324">8 px</text>
+<text class="l" x="16" y="350">em dash</text>
+<text class="n" x="108" y="350">U+2014</text>
+<rect x="176" y="341" width="150" height="7" fill="#15151C"/>
+<text class="n" x="350" y="350">15 px</text>
+<line x1="16" y1="356" x2="470" y2="356" stroke="#E4DFD5"/>
+</svg>

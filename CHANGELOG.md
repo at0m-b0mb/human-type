@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.2.0
+
+**The look-alike dashes are fixed properly, and the clue was in the app all
+along.** 1.1.0 said no font could tell a hyphen from an en dash from an em
+dash. That was true only of *monospace* fonts, and it buried the lead:
+Find & Replace had been showing all three correctly the whole time, six
+inches below an editor that could not. Its entry box is a proportional
+`CTkEntry`. The editor was monospace.
+
+A monospace font gives every character exactly one cell, so an em dash
+physically cannot be drawn longer than a hyphen. A proportional face has no
+such constraint. Measured on this machine:
+
+| Face | `-` | `–` | `—` |
+|---|---:|---:|---:|
+| **Mono** · Menlo 13 | 8 px | 8 px | 8 px |
+| **Sans** · SF Pro Text 14 | 7 px | 9 px | 13 px |
+| **Serif** · Iowan Old Style 15 | 6 px | 8 px | 15 px |
+
+So the editor face is a choice now, in the editor footer:
+
+- **Sans** is the new default — dashes at their real widths, and the closest
+  match to the chat box or form the text is usually headed for.
+- **Serif** separates them most of all; an em dash is two and a half times a
+  hyphen.
+- **Mono** is still there, because aligned columns and visible runs of spaces
+  are a real thing to want. Choosing it is now an informed decision rather
+  than a surprise.
+
+The footer **measures the face that Tk actually loaded** and says what it
+found — `– and — are 9px and 13px wide`, or `- – — all render 8px wide here`
+in amber. It never trusts the family name: ask for a font that is not
+installed and Tk substitutes one silently, so the name in `theme.py` proves
+nothing about the glyphs on screen. `tools/make_dash_figure.py --faces`
+redraws `docs/faces.svg` from the same measurement.
+
+Marks, the caret readout and the inspector all stay. No font can show a
+no-break space or a zero-width joiner, and on a machine where a face gets
+substituted the measurement may come back amber — the backstop still has to
+be there.
+
+### Fixed
+
+- **Cached fonts outlived the Tk root that built them.** A Tk font belongs to
+  one interpreter; handing a stale one to a widget looks fine, but asking it
+  anything — which measuring the dashes does — raises *"application has been
+  destroyed"*. The cache is now keyed to its root and rebuilds itself. This
+  was latent before the editor started measuring its own font.
+
+### Tests
+
+**164**, up from 153. New: the default face provably separating the three
+dashes on this machine, Mono provably still collapsing them, the footer
+reporting what it measured, a face change altering no text and losing no
+marks, the choice surviving a restart, and an unknown face in the config
+falling back instead of crashing.
+
 ## 1.1.0
 
 Three bugs reported from real use, and the feature the first one needed.

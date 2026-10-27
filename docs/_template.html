@@ -298,9 +298,43 @@
     <p class="sub">
       It matters more here than in an ordinary editor. These are the characters
       a document carries in from Word, Pages or a web page, and they are the
-      ones a target window is least likely to have a key for. So the editor
-      stopped relying on the glyph &mdash; three things, none of which touches a
-      byte of your text.
+      ones a target window is least likely to have a key for.
+    </p>
+
+    <h3 style="margin-top:34px">The fix: pick a face that can draw them</h3>
+    <p class="sub">
+      The constraint is <em>monospace</em>, not fonts in general. A proportional
+      face has no one-cell rule &mdash; which is why Find &amp; Replace showed
+      all three correctly the whole time, six inches below an editor that could
+      not. Its entry box is a proportional field. So the editor face is a choice
+      now, in the footer, and the footer <em>measures</em> the face Tk actually
+      loaded rather than trusting the name we asked for.
+    </p>
+
+    <figure class="tight">
+      __FACES__
+      <figcaption>
+        Same three characters, same method: every bar is a measurement.
+        <code>tools/make_dash_figure.py --faces</code>
+      </figcaption>
+    </figure>
+
+    <div class="tablewrap" style="margin-bottom:34px">
+      <table>
+        <thead><tr><th>Face</th><th>What you gain</th><th>What you give up</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Sans</strong> <span class="note">(default)</span></td><td>Dashes at their real widths. Closest to the chat box or form the text is headed for.</td><td>Column alignment</td></tr>
+          <tr><td><strong>Serif</strong></td><td>The widest separation &mdash; an em dash is two and a half times a hyphen.</td><td>Column alignment</td></tr>
+          <tr><td><strong>Mono</strong></td><td>Aligned columns and visible runs of spaces.</td><td>Every dash is one cell wide, so they look identical</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>And three things that work whatever the face</h3>
+    <p class="sub">
+      No font can show a no-break space or a zero-width joiner, and on a machine
+      where a face gets substituted the measurement may come back amber. So the
+      rest stays &mdash; none of it touching a byte of your text.
     </p>
 
     <div class="grid2">
@@ -414,8 +448,8 @@
         <tbody>
           <tr><td><code>test_realism.py</code></td><td class="num">30</td><td>62,119 individual checks — reconstruction, backspace safety, the effort model, rhythm autocorrelation, determinism</td></tr>
           <tr><td><code>test_docimport.py</code></td><td class="num">36</td><td>Real <code>.docx</code> and <code>.odt</code> archives built in memory, RTF, HTML, encodings, zip bombs, entity expansion, XXE, stack exhaustion</td></tr>
-          <tr><td><code>test_theme.py</code></td><td class="num">15</td><td>Every text pairing against WCAG AA, in both themes and all six accents, the look-alike washes included</td></tr>
-          <tr><td><code>test_ui.py</code></td><td class="num">72</td><td>Every page and dialog builds, nothing is clipped out of its own window, dialogs stay hidden until they are finished, marks tint the right characters and change none of them, settings round-trip, end-to-end runs reproduce their input</td></tr>
+          <tr><td><code>test_theme.py</code></td><td class="num">19</td><td>Every text pairing against WCAG AA, in both themes and all six accents, the look-alike washes included</td></tr>
+          <tr><td><code>test_ui.py</code></td><td class="num">80</td><td>Every page and dialog builds, nothing is clipped out of its own window, dialogs stay hidden until they are finished, marks tint the right characters and change none of them, settings round-trip, end-to-end runs reproduce their input</td></tr>
         </tbody>
       </table>
     </div>
